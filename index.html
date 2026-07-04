@@ -78,8 +78,8 @@
   #apMaster.on{background:#1f4030;border-color:var(--green);color:var(--green);font-weight:700;}
   /* overhead switch panel */
   #ovhdBtn{position:absolute;right:10px;top:46px;}
-  #ovhd{position:absolute;right:10px;top:80px;width:238px;background:#0c0f16f2;border:1px solid #2a3448;
-    border-radius:12px;padding:12px;display:none;}
+  #ovhd{position:absolute;right:10px;top:80px;width:252px;background:#0c0f16f2;border:1px solid #2a3448;
+    border-radius:12px;padding:12px;display:none;max-height:calc(100vh - 96px);overflow-y:auto;}
   #ovhd h3{font-size:11px;letter-spacing:2px;color:var(--amber);text-align:center;margin-bottom:8px;}
   #ovhd .grp{font-size:9px;color:var(--dim);letter-spacing:1.5px;margin:8px 0 4px;border-bottom:1px solid #1e2636;padding-bottom:2px;}
   .swgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
@@ -92,6 +92,24 @@
   .sw.on .knob{top:1px;background:var(--amber);box-shadow:0 0 7px var(--amber);}
   .sw.on .lbl{color:var(--txt);}
   .sw.guard{border-color:#5c3030;}
+  /* rotary selector */
+  .sw.rot{justify-content:flex-start;}
+  .sw.rot .rotval{font:700 9px Consolas,monospace;color:var(--amber);text-align:center;
+    background:#090c12;border:1px solid #333d55;border-radius:4px;padding:3px 2px;width:100%;min-height:15px;line-height:1;}
+  .sw.rot.on .rotval{color:var(--green);border-color:#2c5c40;}
+  .sw.hi{border-color:var(--cyan)!important;box-shadow:0 0 0 2px var(--cyan),0 0 16px #5fd4d0;animation:swpulse 1.05s infinite;}
+  @keyframes swpulse{50%{box-shadow:0 0 0 2px var(--cyan),0 0 3px #5fd4d0;}}
+  /* guided startup panel */
+  #guide{position:absolute;left:10px;top:130px;width:266px;background:#0b0f18f4;border:1px solid #2a3550;
+    border-radius:11px;padding:10px 12px;display:none;max-height:64vh;overflow-y:auto;}
+  #guide h4{color:var(--amber);font-size:10.5px;letter-spacing:1.5px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;}
+  #guide h4 .x{color:var(--cyan);cursor:pointer;font-size:13px;padding:0 4px;}
+  #guideNextWrap{font-size:8.5px;letter-spacing:1.2px;color:var(--dim);background:#0e1826;
+    border:1px solid #24406a;border-radius:8px;padding:7px 9px;margin-bottom:9px;}
+  #guideNext{color:var(--cyan);font-size:13.5px;letter-spacing:.2px;display:block;margin-top:3px;line-height:1.25;}
+  .gstep{font-size:11px;padding:3px 2px;color:var(--dim);line-height:1.25;border-radius:4px;}
+  .gstep.done{color:var(--green);}
+  .gstep.cur{color:#fff;font-weight:700;background:#13233a;}
   /* copilot feed */
   #copilot{position:absolute;left:10px;top:130px;width:250px;display:flex;flex-direction:column;gap:5px;}
   .cpmsg{background:#0d1118d9;border-left:3px solid var(--cyan);border-radius:0 8px 8px 0;
@@ -199,6 +217,7 @@
     <button class="chipbtn clickable" id="btnMap">Map [M]</button>
     <button class="chipbtn clickable" id="btnTime">1x [T]</button>
     <button class="chipbtn clickable" id="btnPause">Pause [P]</button>
+    <button class="chipbtn clickable" id="btnGuide">Guide</button>
     <button class="chipbtn clickable" id="btnHelp">Help [H]</button>
     <button class="chipbtn clickable" id="btnQuit">Menu</button>
   </div>
@@ -218,6 +237,11 @@
 
   <div id="copilot"></div>
   <div id="checklist" class="clickable"><h4>STARTUP CHECKLIST</h4><div id="ckItems"></div></div>
+  <div id="guide" class="clickable">
+    <h4>GUIDED STARTUP <span class="x" id="guideX">&#9662;</span></h4>
+    <div id="guideNextWrap">NEXT ACTION<b id="guideNext">&mdash;</b></div>
+    <div id="guideItems"></div>
+  </div>
 
   <div id="instWrap"><canvas id="inst" width="960" height="168"></canvas></div>
 
@@ -259,7 +283,7 @@
       <kbd>W</kbd>/<kbd>S</kbd> throttle &nbsp; <kbd>F</kbd>/<kbd>R</kbd> flaps extend / retract &nbsp; <kbd>G</kbd> gear &nbsp; <kbd>B</kbd> brakes (hold)<br>
       <kbd>C</kbd> or <kbd>1..5</kbd> views: cockpit / cabin / chase / tower / wing<br>
       <kbd>M</kbd> nav map &nbsp; <kbd>T</kbd> time 1-2-4-8x &nbsp; <kbd>P</kbd> pause &nbsp; <kbd>H</kbd> this help<br><br>
-      <b style="color:var(--amber)">Cold &amp; dark?</b> Open the OVERHEAD PANEL: Battery &rarr; Fuel pumps &rarr; Engine masters &rarr; Avionics &rarr; Lights. The jet only wakes up if you wake it up.<br><br>
+      <b style="color:var(--amber)">Cold &amp; dark?</b> The GUIDED STARTUP panel walks you through every step and glows the exact switch to touch on the OVERHEAD PANEL &mdash; battery &rarr; APU &rarr; bleed &rarr; fuel pumps &rarr; engine start, in the right order. Rotary knobs (ENG MODE, IGNITION, CONDITION levers) click to cycle positions. Each aircraft carries its own real systems.<br><br>
       <span style="color:var(--dim)">Fly the numbers: rotate at Vr, gear up on positive climb, flaps on schedule, ~3&deg; descent, touch down under 300 fpm for the butter.</span><br><br>
       <button class="bigbtn ghost" onclick="document.getElementById('help').style.display='none'">CLOSE</button>
     </div>
@@ -290,16 +314,16 @@ if(typeof THREE==="undefined"){
 
 /* ---------------- DATA ---------------- */
 const AIRCRAFT={
-  c172:{name:"Cessna 172 Skyhawk",role:"General Aviation · 4 seats",type:"prop",engines:1,
+  c172:{name:"Cessna 172 Skyhawk",role:"General Aviation · 4 seats",type:"prop",engines:1,apu:false,
     vs0:48,vsF:40,vr:55,v1:0,cruise:115,vmax:163,accel:3.2,climb:730,ceiling:14000,size:0.55,
     burn:0.022,tail:0xc0392b,desc:"Slow, honest, forgiving. The world looks best at 100 knots."},
-  q400:{name:"Dash 8 Q400",role:"Regional Turboprop · 78 pax",type:"prop",engines:2,
+  q400:{name:"Dash 8 Q400",role:"Regional Turboprop · 78 pax",type:"prop",engines:2,apu:false,
     vs0:95,vsF:78,vr:112,v1:105,cruise:360,vmax:400,accel:4.2,climb:2000,ceiling:27000,size:1.5,
     burn:0.038,tail:0x2980b9,desc:"Prop power with airline manners. Loud, quick, characterful."},
-  a320:{name:"Airbus A320neo",role:"Narrow-body Jet · 180 pax",type:"jet",engines:2,
+  a320:{name:"Airbus A320neo",role:"Narrow-body Jet · 180 pax",type:"jet",engines:2,apu:true,
     vs0:118,vsF:98,vr:140,v1:135,cruise:450,vmax:487,accel:4.6,climb:2400,ceiling:39800,size:2.0,
     burn:0.048,tail:0x16a085,desc:"The world's short-haul workhorse. Calls 'retard' at 20 feet."},
-  b787:{name:"Boeing 787-9 Dreamliner",role:"Wide-body Jet · 290 pax",type:"jet",engines:2,
+  b787:{name:"Boeing 787-9 Dreamliner",role:"Wide-body Jet · 290 pax",type:"jet",engines:2,apu:true,estart:true,
     vs0:128,vsF:105,vr:155,v1:148,cruise:488,vmax:516,accel:4.3,climb:2600,ceiling:43000,size:2.7,
     burn:0.055,tail:0x34495e,desc:"Long legs, raked wingtips, whisper-quiet flight deck."}
 };
@@ -722,87 +746,280 @@ function buildWorld(){
   S.ap.hdg=360;
 }
 
-/* ---------------- SWITCH PANEL ---------------- */
-const SW_DEFS=[
-  ["ELECTRICAL",[["bat","BATTERY"],["apu","APU"],["avionics","AVIONICS"]]],
-  ["FUEL",[["pumpL","PUMP L"],["pumpR","PUMP R"]]],
-  ["ENGINES",[["eng1","ENG 1 MASTER",1],["eng2","ENG 2 MASTER",1]]],
-  ["EXTERIOR LIGHTS",[["beacon","BEACON"],["nav","NAV"],["strobe","STROBE"],["landing","LANDING"],["taxi","TAXI"]]],
-  ["ICE & CABIN",[["pitot","PITOT HEAT"],["antiice","ANTI-ICE"],["belts","SEATBELTS"]]],
-  ["AUDIO",[["sound","SOUND"],["callouts","CALLOUTS"]]]
-];
+/* ---------------- PER-AIRCRAFT SYSTEMS ---------------- */
+const PWR={elec:false,avionics:false,bleed:false};
+function curAcId(){for(const k in AIRCRAFT)if(AIRCRAFT[k]===AC)return k;return "a320";}
+/* procedure predicate builders */
+const P={
+  on:k=>()=>!!SYS[k],
+  rotAt:(k,i)=>()=>((SYS[k]|0)===i),
+  rotMin:(k,i)=>()=>((SYS[k]|0)>=i),
+  apuAvail:()=>S.apu&&S.apu.state==="avail",
+  engRun:i=>()=>!!(S.eng[i]&&S.eng[i].running),
+  thr:(a,b)=>()=>S.throttle>=a&&S.throttle<=b
+};
+const SYSDEF={
+  c172:{panels:[
+    {g:"MASTER",items:[{k:"bat",l:"BAT MASTER"},{k:"alt",l:"ALTERNATOR"},{k:"avionics",l:"AVIONICS"}]},
+    {g:"FUEL",items:[{k:"fuelSel",l:"FUEL SEL",t:"rot",pos:["OFF","LEFT","BOTH","RIGHT"],def:0},{k:"fuelPump",l:"AUX PUMP"}]},
+    {g:"ENGINE",items:[{k:"mixture",l:"MIXTURE",t:"rot",pos:["CUTOFF","RICH"],def:0},{k:"carbHeat",l:"CARB HEAT"},{k:"mag",l:"IGNITION",t:"rot",pos:["OFF","R","L","BOTH","START"],def:0,mom:4}]},
+    {g:"LIGHTS",items:[{k:"beacon",l:"BEACON"},{k:"nav",l:"NAV"},{k:"strobe",l:"STROBE"},{k:"landing",l:"LANDING"},{k:"taxi",l:"TAXI"}]},
+    {g:"ICE / CABIN",items:[{k:"pitot",l:"PITOT HEAT"},{k:"belts",l:"SEATBELTS"}]},
+    {g:"AUDIO",items:[{k:"sound",l:"SOUND"},{k:"callouts",l:"CALLOUTS"}]}
+  ],proc:[
+    {tip:"BAT MASTER — ON",voice:"Battery master on",hi:"bat",done:P.on("bat")},
+    {tip:"ALTERNATOR — ON",voice:"Alternator on",hi:"alt",done:P.on("alt")},
+    {tip:"FUEL SELECTOR — BOTH",voice:"Fuel selector both",hi:"fuelSel",done:P.rotAt("fuelSel",2)},
+    {tip:"AUX FUEL PUMP — ON",voice:"Fuel pump on",hi:"fuelPump",done:P.on("fuelPump")},
+    {tip:"MIXTURE — RICH",voice:"Mixture rich",hi:"mixture",done:P.rotAt("mixture",1)},
+    {tip:"THROTTLE — CRACK ~10%",voice:"Crack the throttle",hi:null,done:P.thr(0.05,0.35)},
+    {tip:"BEACON — ON",voice:"Beacon on",hi:"beacon",done:P.on("beacon")},
+    {tip:"IGNITION — turn to START",voice:"Ignition, start",hi:"mag",done:P.engRun(0)},
+    {tip:"AVIONICS MASTER — ON",voice:"Avionics master on",hi:"avionics",done:P.on("avionics")}
+  ]},
+  q400:{panels:[
+    {g:"ELECTRICAL",items:[{k:"bat",l:"BATTERY"},{k:"extpwr",l:"EXT PWR"},{k:"avionics",l:"AVIONICS"}]},
+    {g:"FUEL",items:[{k:"fuelPumpL",l:"PUMP 1"},{k:"fuelPumpR",l:"PUMP 2"}]},
+    {g:"POWER LEVERS",items:[{k:"condL",l:"COND 1",t:"rot",pos:["FUEL OFF","START","MIN","MAX"],def:0},{k:"condR",l:"COND 2",t:"rot",pos:["FUEL OFF","START","MIN","MAX"],def:0}]},
+    {g:"START / IGN",items:[{k:"engStart1",l:"ENG 1 START"},{k:"engStart2",l:"ENG 2 START"},{k:"ignition",l:"IGNITION"}]},
+    {g:"LIGHTS",items:[{k:"beacon",l:"BEACON"},{k:"nav",l:"NAV"},{k:"strobe",l:"STROBE"},{k:"landing",l:"LANDING"},{k:"taxi",l:"TAXI"}]},
+    {g:"ICE / CABIN",items:[{k:"pitot",l:"PITOT/PROBE"},{k:"antiice",l:"PROP DEICE"},{k:"belts",l:"SEATBELTS"}]},
+    {g:"AUDIO",items:[{k:"sound",l:"SOUND"},{k:"callouts",l:"CALLOUTS"}]}
+  ],proc:[
+    {tip:"BATTERY — ON",voice:"Battery on",hi:"bat",done:P.on("bat")},
+    {tip:"FUEL PUMP 1 — ON",voice:"Fuel pump one on",hi:"fuelPumpL",done:P.on("fuelPumpL")},
+    {tip:"FUEL PUMP 2 — ON",voice:"Fuel pump two on",hi:"fuelPumpR",done:P.on("fuelPumpR")},
+    {tip:"CONDITION 1 — START/FEATHER",voice:"Condition lever one, start feather",hi:"condL",done:P.rotMin("condL",1)},
+    {tip:"ENG 1 START — ON (spooling)",voice:"Start engine one",hi:"engStart1",done:P.engRun(0)},
+    {tip:"CONDITION 2 — START/FEATHER",voice:"Condition lever two, start feather",hi:"condR",done:P.rotMin("condR",1)},
+    {tip:"ENG 2 START — ON (spooling)",voice:"Start engine two",hi:"engStart2",done:P.engRun(1)},
+    {tip:"AVIONICS — ON",voice:"Avionics on",hi:"avionics",done:P.on("avionics")},
+    {tip:"BEACON — ON",voice:"Beacon on",hi:"beacon",done:P.on("beacon")}
+  ]},
+  a320:{panels:[
+    {g:"ELECTRICAL",items:[{k:"bat1",l:"BAT 1"},{k:"bat2",l:"BAT 2"},{k:"extpwr",l:"EXT PWR"},{k:"avionics",l:"AVIONICS"}]},
+    {g:"APU",items:[{k:"apuMaster",l:"APU MASTER"},{k:"apuStart",l:"APU START"},{k:"apuBleed",l:"APU BLEED"}]},
+    {g:"FUEL PUMPS",items:[{k:"pumpL",l:"TK 1 PUMP"},{k:"pumpR",l:"TK 2 PUMP"}]},
+    {g:"ENGINE",items:[{k:"engMode",l:"ENG MODE",t:"rot",pos:["CRANK","NORM","IGN/START"],def:1},{k:"engMaster1",l:"ENG 1 MASTER"},{k:"engMaster2",l:"ENG 2 MASTER"}]},
+    {g:"AIR / HYD",items:[{k:"pack1",l:"PACK 1"},{k:"pack2",l:"PACK 2"},{k:"hydG",l:"HYD GRN"},{k:"hydB",l:"HYD BLU"},{k:"hydY",l:"HYD YLW"}]},
+    {g:"NAV / ADIRS",items:[{k:"adirs",l:"ADIRS"},{k:"beacon",l:"BEACON"},{k:"nav",l:"NAV/LOGO"},{k:"strobe",l:"STROBE"},{k:"landing",l:"LANDING"},{k:"taxi",l:"NOSE/TAXI"}]},
+    {g:"ICE / SIGNS",items:[{k:"pitot",l:"PROBE HEAT"},{k:"antiice",l:"WING A/I"},{k:"belts",l:"SEATBELTS"},{k:"noSmk",l:"NO SMOKING"}]},
+    {g:"AUDIO",items:[{k:"sound",l:"SOUND"},{k:"callouts",l:"CALLOUTS"}]}
+  ],proc:[
+    {tip:"BAT 1 — ON",voice:"Battery one on",hi:"bat1",done:P.on("bat1")},
+    {tip:"BAT 2 — ON",voice:"Battery two on",hi:"bat2",done:P.on("bat2")},
+    {tip:"ADIRS — ON (align)",voice:"Inertial reference, on",hi:"adirs",done:P.on("adirs")},
+    {tip:"APU MASTER — ON",voice:"A P U master on",hi:"apuMaster",done:P.on("apuMaster")},
+    {tip:"APU START — ON, wait for AVAIL",voice:"A P U start",hi:"apuStart",done:()=>P.apuAvail()},
+    {tip:"APU BLEED — ON",voice:"A P U bleed on",hi:"apuBleed",done:P.on("apuBleed")},
+    {tip:"TK 1 FUEL PUMP — ON",voice:"Tank one pump on",hi:"pumpL",done:P.on("pumpL")},
+    {tip:"TK 2 FUEL PUMP — ON",voice:"Tank two pump on",hi:"pumpR",done:P.on("pumpR")},
+    {tip:"ENG MODE — IGN/START",voice:"Engine mode, ignition start",hi:"engMode",done:P.rotAt("engMode",2)},
+    {tip:"ENG 1 MASTER — ON (monitor start)",voice:"Engine one master on",hi:"engMaster1",done:P.engRun(0)},
+    {tip:"ENG 2 MASTER — ON (monitor start)",voice:"Engine two master on",hi:"engMaster2",done:P.engRun(1)},
+    {tip:"ENG MODE — NORM",voice:"Engine mode norm",hi:"engMode",done:P.rotAt("engMode",1)},
+    {tip:"EXT LIGHTS — BEACON ON",voice:"Beacon on",hi:"beacon",done:P.on("beacon")}
+  ]},
+  b787:{panels:[
+    {g:"ELECTRICAL",items:[{k:"bat1",l:"BATTERY"},{k:"extpwr",l:"EXT PWR"},{k:"gen1",l:"L GEN"},{k:"gen2",l:"R GEN"},{k:"avionics",l:"AVIONICS"}]},
+    {g:"APU",items:[{k:"apuMaster",l:"APU SELECTOR"},{k:"apuStart",l:"APU START"}]},
+    {g:"FUEL PUMPS",items:[{k:"pumpL",l:"L FWD PUMP"},{k:"pumpR",l:"R FWD PUMP"}]},
+    {g:"ENGINE START",items:[{k:"engMode",l:"START SEL",t:"rot",pos:["NORM","START"],def:0},{k:"engMaster1",l:"ENG 1",t:"rot",pos:["OFF","RUN"],def:0},{k:"engMaster2",l:"ENG 2",t:"rot",pos:["OFF","RUN"],def:0}]},
+    {g:"HYDRAULICS",items:[{k:"hydG",l:"HYD C"},{k:"hydB",l:"HYD L"},{k:"hydY",l:"HYD R"}]},
+    {g:"LIGHTS",items:[{k:"beacon",l:"BEACON"},{k:"nav",l:"NAV"},{k:"strobe",l:"STROBE"},{k:"landing",l:"LANDING"},{k:"taxi",l:"TAXI"}]},
+    {g:"ICE / SIGNS",items:[{k:"pitot",l:"PROBE HEAT"},{k:"antiice",l:"WING A/I"},{k:"belts",l:"SEATBELTS"},{k:"noSmk",l:"NO SMOKING"}]},
+    {g:"AUDIO",items:[{k:"sound",l:"SOUND"},{k:"callouts",l:"CALLOUTS"}]}
+  ],proc:[
+    {tip:"BATTERY — ON",voice:"Battery on",hi:"bat1",done:P.on("bat1")},
+    {tip:"APU SELECTOR — ON",voice:"A P U selector on",hi:"apuMaster",done:P.on("apuMaster")},
+    {tip:"APU START — ON, wait for AVAIL",voice:"A P U start",hi:"apuStart",done:()=>P.apuAvail()},
+    {tip:"L FUEL PUMP — ON",voice:"Left fuel pump on",hi:"pumpL",done:P.on("pumpL")},
+    {tip:"R FUEL PUMP — ON",voice:"Right fuel pump on",hi:"pumpR",done:P.on("pumpR")},
+    {tip:"START SELECTOR — START",voice:"Start selector, start",hi:"engMode",done:P.rotAt("engMode",1)},
+    {tip:"ENG 1 — RUN (electric start)",voice:"Engine one, run",hi:"engMaster1",done:P.engRun(0)},
+    {tip:"ENG 2 — RUN (electric start)",voice:"Engine two, run",hi:"engMaster2",done:P.engRun(1)},
+    {tip:"AVIONICS — ON",voice:"Avionics on",hi:"avionics",done:P.on("avionics")},
+    {tip:"BEACON — ON",voice:"Beacon on",hi:"beacon",done:P.on("beacon")}
+  ]}
+};
+const GUIDE={steps:[],idx:0,active:false};
+function guideHiKey(){const st=GUIDE.steps[GUIDE.idx];return st?st.hi:null;}
+function findItem(k){for(const grp of SYSDEF[curAcId()].panels)for(const it of grp.items)if(it.k===k)return it;return null;}
+
 function buildSwitches(){
   const host=document.getElementById("swGroups");host.innerHTML="";
-  for(const [grp,items] of SW_DEFS){
-    const h=document.createElement("div");h.className="grp";h.textContent=grp;host.appendChild(h);
+  for(const grp of SYSDEF[curAcId()].panels){
+    const h=document.createElement("div");h.className="grp";h.textContent=grp.g;host.appendChild(h);
     const g=document.createElement("div");g.className="swgrid";host.appendChild(g);
-    for(const [key,label,guard] of items){
-      if(key==="eng2"&&AC.engines<2)continue;
-      const el=document.createElement("div");
-      el.className="sw"+(guard?" guard":"")+(SYS[key]?" on":"");
-      el.dataset.k=key;
-      el.innerHTML='<div class="track"><div class="knob"></div></div><div class="lbl">'+label+"</div>";
-      el.onclick=()=>{toggleSys(key,el);};
+    for(const it of grp.items){
+      const el=document.createElement("div");el.dataset.k=it.k;
+      if(it.t==="rot"){
+        el.className="sw rot";
+        el.innerHTML='<div class="rotval"></div><div class="lbl">'+it.l+'</div>';
+        el.onclick=()=>cycleRot(it);
+      }else{
+        el.className="sw";
+        el.innerHTML='<div class="track"><div class="knob"></div></div><div class="lbl">'+it.l+'</div>';
+        el.onclick=()=>flipToggle(it.k);
+      }
       g.appendChild(el);
     }
   }
+  refreshSwitchUI();
 }
 function refreshSwitchUI(){
   document.querySelectorAll("#swGroups .sw").forEach(el=>{
-    el.classList.toggle("on",!!SYS[el.dataset.k]);
+    const k=el.dataset.k;
+    if(el.classList.contains("rot")){
+      const it=findItem(k),v=SYS[k]|0;
+      const rv=el.querySelector(".rotval");if(rv)rv.textContent=it?it.pos[v]:v;
+      el.classList.toggle("on",v>0);
+    }else{
+      el.classList.toggle("on",!!SYS[k]);
+    }
+    el.classList.toggle("hi",GUIDE.active&&guideHiKey()===k);
   });
 }
-function toggleSys(key){
-  SYS[key]=SYS[key]?0:1;
-  clickSnd();refreshSwitchUI();
-  const on=SYS[key];
-  if(key==="bat")copilot(on?"Battery on — buses alive.":"Battery off. Everything just went dark.");
-  if(key==="avionics"&&on)copilot("Avionics online. Screens coming up.");
-  if(key==="landing"&&on&&ENV.time==="night")copilot("Landing lights — now we can see the runway, and it can see us.");
-  if(key==="belts"&&on)copilot("Seatbelt signs on.");
-  if(key==="pitot"&&on&&S.pitotIce){copilot("Pitot heat on — airspeed indication recovering.");}
-  if((key==="eng1"||key==="eng2")&&on){
-    if(!SYS.bat)copilot("Engine master is on, but there's no electrical power. Battery first.",false);
-    else if(!SYS.pumpL&&!SYS.pumpR)copilot("No fuel pressure — get a fuel pump on.");
+function flipToggle(k){SYS[k]=SYS[k]?0:1;clickSnd();refreshSwitchUI();sysHint(k);}
+function cycleRot(it){
+  let v=(SYS[it.k]|0)+1;if(v>=it.pos.length)v=0;
+  SYS[it.k]=v;clickSnd();refreshSwitchUI();sysHint(it.k);
+  if(it.mom&&v===it.mom){
+    setTimeout(()=>{if((SYS[it.k]|0)===it.mom){SYS[it.k]=it.mom-1;refreshSwitchUI();}},1300);
   }
-  ckUpdate();
 }
-function enginesRunning(){
-  if(!SYS.bat||S.fuel<=0||(!SYS.pumpL&&!SYS.pumpR))return 0;
-  let n=0;if(SYS.eng1)n++;if(AC.engines>1&&SYS.eng2)n++;
-  return n;
+function sysHint(k){
+  const on=SYS[k];
+  if((k==="bat"||k==="bat1")&&on)copilot("Battery on — DC bus is alive.");
+  if(k==="bat2"&&on)copilot("Battery 2 on.");
+  if(k==="avionics")copilot(on?"Avionics powered — screens coming alive.":"Avionics off.");
+  if(k==="apuMaster"&&on)copilot("APU master on — now hit APU START and wait for AVAIL.");
+  if(k==="apuStart"&&on&&!(SYS.bat||SYS.bat1||SYS.extpwr))copilot("No electrical power — battery first, then the APU will crank.",false);
+  if(k==="apuBleed"&&on&&!P.apuAvail())copilot("APU bleed armed — waiting on the APU to come available.");
+  if((k==="engMaster1"||k==="engMaster2"||k==="engStart1"||k==="engStart2")&&on&&AC.type==="jet"){
+    if(!PWR.bleed&&!AC.estart)copilot("No bleed air to spin the starter — start the APU and open APU BLEED first.",false);
+    else if(!fuelPressure())copilot("No fuel pressure — get a fuel pump on.",false);
+    else copilot("Starter valve open — N2 rising, watch for light-up.");
+  }
+  if(k==="pitot"&&on&&S.pitotIce)copilot("Probe heat on — airspeed recovering.");
+  if(k==="landing"&&on&&ENV.time!=="day")copilot("Landing lights on — the runway can see us now.");
+  if(k==="belts"&&on)copilot("Seatbelt signs on.");
 }
-
-/* ---------------- CHECKLIST ---------------- */
-const CK=[
-  ["bat","Battery ........ ON"],
-  ["pumpL","Fuel pump ...... ON"],
-  ["eng1","Engine master .. ON"],
-  ["avionics","Avionics ....... ON"],
-  ["beacon","Beacon ......... ON"],
-  ["nav","Nav lights ..... ON"],
-  ["landing","Landing lights . ON"]
-];
-function ckUpdate(){
-  if(!S.coldDark)return;
-  const host=document.getElementById("ckItems");host.innerHTML="";
-  let allDone=true,nextSeen=false;
-  for(const [k,label] of CK){
-    const done=!!SYS[k];
-    if(!done)allDone=false;
-    const d=document.createElement("div");
-    d.className="ck"+(done?" done":(!nextSeen?" next":""));
-    if(!done)nextSeen=true;
-    d.textContent=(done?"✓ ":"○ ")+label;
+/* electrical / bleed / engine-start simulation */
+function fuelPressure(){return SYS.pumpL||SYS.pumpR||SYS.fuelPump||SYS.fuelPumpL||SYS.fuelPumpR;}
+function engMasterOn(i){
+  const n=i+1;
+  if(AC===AIRCRAFT.q400)return !!SYS["engStart"+n]&&((SYS[i?"condR":"condL"]|0)>=1);
+  if(AC===AIRCRAFT.b787)return (SYS["engMaster"+n]|0)>=1;
+  return !!SYS["engMaster"+n];
+}
+function engModeStart(){return AC===AIRCRAFT.b787?((SYS.engMode|0)===1):((SYS.engMode|0)===2);}
+function updateSystems(dt){
+  const batOn=SYS.bat||SYS.bat1||SYS.bat2||SYS.extpwr||SYS.gen1||SYS.gen2;
+  const A=S.apu;
+  if(AC.apu){
+    if(SYS.apuMaster&&SYS.apuStart&&batOn&&A.state==="off"){A.state="start";A.spool=0;copilot("APU spooling up…");}
+    if(A.state==="start"){A.spool+=dt/13;if(A.spool>=1){A.state="avail";A.spool=1;copilot("APU AVAIL — bleed air and generator online.");say("A P U available.");}}
+    if(!SYS.apuMaster){A.state="off";A.spool=0;}
+  }else{A.state="off";A.spool=0;}
+  const apuGen=AC.apu&&A.state==="avail"&&SYS.apuMaster;
+  let engRun=false;for(const e of S.eng)if(e.running){engRun=true;break;}
+  PWR.elec=!!(batOn||apuGen||engRun);
+  PWR.avionics=!!(PWR.elec&&SYS.avionics);
+  const bleedAPU=AC.apu&&A.state==="avail"&&SYS.apuBleed;
+  PWR.bleed=(AC.type==="jet")?!!(bleedAPU||engRun):true;
+  for(let i=0;i<AC.engines;i++){
+    const e=S.eng[i];let crank=false,keep=false;
+    if(AC===AIRCRAFT.c172){
+      const fuelOk=S.fuel>0&&((SYS.fuelSel|0)===2)&&((SYS.mixture|0)===1);
+      crank=((SYS.mag|0)>=4)&&PWR.elec&&fuelOk;
+      keep=((SYS.mag|0)>=1)&&fuelOk;
+    }else{
+      const fuelOk=S.fuel>0&&fuelPressure();
+      const arm=(AC.type==="jet")?(engModeStart()&&(AC.estart||PWR.bleed)):true;
+      crank=engMasterOn(i)&&PWR.elec&&fuelOk&&arm;
+      keep=engMasterOn(i)&&fuelOk;
+    }
+    if(!e.running){
+      if(crank){
+        e.n2=Math.min(1,e.n2+dt/(AC.type==="jet"?7:4.5));
+        if(e.n2>0.2&&!e.lit){e.lit=true;e.egt=0.75;}
+        if(e.n2>=0.98){e.running=true;e.n2=1;copilot((AC.type==="jet"?"Engine ":"Prop ")+(i+1)+" stabilised at idle.");}
+      }else{e.n2=Math.max(0,e.n2-dt*0.4);if(e.n2<0.02){e.lit=false;e.egt=0;}}
+    }else{
+      if(!keep){e.running=false;copilot((AC.type==="jet"?"Engine ":"Prop ")+(i+1)+" shut down.");}
+      e.egt=Math.max(0.3,e.egt-dt*0.1);
+    }
+  }
+}
+function enginesRunning(){if(S.fuel<=0)return 0;let n=0;for(const e of S.eng)if(e.running)n++;return n;}
+function resetSystems(){
+  for(const k in SYS){if(k==="sound"||k==="callouts")continue;delete SYS[k];}
+  for(const grp of SYSDEF[curAcId()].panels)for(const it of grp.items){SYS[it.k]=(it.t==="rot")?(it.def||0):0;}
+  if(!("sound"in SYS))SYS.sound=1;if(!("callouts"in SYS))SYS.callouts=1;
+  S.apu={state:"off",spool:0};
+  S.eng=[];for(let i=0;i<AC.engines;i++)S.eng.push({running:false,n2:0,egt:0,lit:false});
+  PWR.elec=PWR.avionics=PWR.bleed=false;
+}
+function setWarmSystems(){
+  const on=k=>{if(k in SYS)SYS[k]=1;};
+  ["bat","bat1","bat2","avionics","pumpL","pumpR","fuelPump","fuelPumpL","fuelPumpR","ignition",
+   "beacon","nav","strobe","belts","pitot","gen1","gen2","hydG","hydB","hydY","pack1","pack2","adirs","noSmk","alt"].forEach(on);
+  SYS.landing=(ENV.time!=="day")?1:0;
+  if(AC===AIRCRAFT.c172){SYS.fuelSel=2;SYS.mixture=1;SYS.mag=3;}
+  if(AC===AIRCRAFT.q400){SYS.condL=2;SYS.condR=2;SYS.engStart1=1;SYS.engStart2=1;}
+  if(AC===AIRCRAFT.a320){SYS.engMode=1;SYS.engMaster1=1;SYS.engMaster2=1;}
+  if(AC===AIRCRAFT.b787){SYS.engMode=0;SYS.engMaster1=1;SYS.engMaster2=1;SYS.gen1=1;SYS.gen2=1;}
+  for(const e of S.eng){e.running=true;e.n2=1;e.lit=true;e.egt=0.4;}
+  updateSystems(0);
+}
+/* ---------------- GUIDED STARTUP DIRECTOR ---------------- */
+function guideStart(){
+  GUIDE.steps=(SYSDEF[curAcId()].proc||[]).slice();
+  GUIDE.seen=new Array(GUIDE.steps.length).fill(false);
+  GUIDE.idx=0;GUIDE.active=true;
+  document.getElementById("guide").style.display="block";
+  guideAnnounce();renderGuide();refreshSwitchUI();
+}
+function guideAnnounce(){
+  const st=GUIDE.steps[GUIDE.idx];
+  if(st){copilot("<b>NEXT:</b> "+st.tip,true);say(st.voice);}
+}
+function guideTick(){
+  if(!GUIDE.active)return;
+  /* latch any step that has ever been satisfied (order-independent) */
+  for(let j=0;j<GUIDE.steps.length;j++){if(!GUIDE.seen[j]&&GUIDE.steps[j].done())GUIDE.seen[j]=true;}
+  let advanced=false;
+  while(GUIDE.idx<GUIDE.steps.length&&GUIDE.seen[GUIDE.idx]){GUIDE.idx++;advanced=true;}
+  if(advanced){
+    clickSnd();
+    if(GUIDE.idx>=GUIDE.steps.length)guideComplete();
+    else guideAnnounce();
+    renderGuide();refreshSwitchUI();
+  }
+}
+function guideComplete(){
+  GUIDE.active=false;
+  document.getElementById("guide").style.display="none";
+  cpEl.style.top="130px";S.coldDark=false;
+  copilot("Startup complete — every system is online and stable. Cleared for taxi and takeoff, Captain.",true);
+  say("Startup complete. Cleared for takeoff.");
+  refreshSwitchUI();
+}
+function renderGuide(){
+  const host=document.getElementById("guideItems");if(!host)return;host.innerHTML="";
+  GUIDE.steps.forEach((st,i)=>{
+    const state=i<GUIDE.idx?"done":(i===GUIDE.idx?"cur":"todo");
+    const d=document.createElement("div");d.className="gstep "+state;
+    d.textContent=(state==="done"?"✓ ":state==="cur"?"▸ ":"○ ")+st.tip;
     host.appendChild(d);
-  }
-  if(allDone){
-    document.getElementById("checklist").style.display="none";
-    cpEl.style.top="130px";
-    S.coldDark=false;
-    copilot("Checklist complete. She's alive — cleared for departure whenever you are, Captain.");
-    say("Checklist complete. Cleared for takeoff.");
-  }
+  });
+  const ne=document.getElementById("guideNext");
+  if(ne)ne.textContent=GUIDE.active?(GUIDE.steps[GUIDE.idx]?GUIDE.steps[GUIDE.idx].tip:"…"):"ALL COMPLETE ✓";
+}
+function guideToggle(){
+  if(GUIDE.active){GUIDE.active=false;document.getElementById("guide").style.display="none";refreshSwitchUI();}
+  else guideStart();
 }
 
 /* ---------------- INSTRUMENTS ---------------- */
@@ -822,7 +1039,7 @@ function needle(x,y,r,angDeg,color,w){
 }
 function drawInstruments(){
   ig.clearRect(0,0,960,168);
-  const powered=SYS.bat&&SYS.avionics;
+  const powered=PWR.avionics;
   const cy=78,r=62;
   /* --- attitude --- */
   const ax=88;
@@ -916,34 +1133,44 @@ function drawInstruments(){
   ig.fillStyle="#0d1017";ig.fillRect(ex,16,238,136);
   ig.strokeStyle="#2c3548";ig.strokeRect(ex,16,238,136);
   ig.fillStyle="#5a6478";ig.font="9px Consolas";ig.textAlign="left";
-  ig.fillText(AC.type==="jet"?"N1 %":"PROP RPM %",ex+10,32);
-  const nEng=AC.engines,running=enginesRunning();
+  ig.fillText(AC.type==="jet"?"N1 % / N2":"NP % / ITT",ex+10,32);
+  const nEng=AC.engines;
   for(let i=0;i<nEng;i++){
-    const on=(i===0?SYS.eng1:SYS.eng2)&&running>0;
-    const val=on?S.n1:0;
-    ig.fillStyle="#161c28";ig.fillRect(ex+10+i*66,38,52,58);
-    ig.fillStyle=on?(val>0.95?"#ff8080":"#59d98c"):"#2a3348";
-    ig.fillRect(ex+10+i*66,38+58*(1-val),52,58*val);
-    ig.strokeStyle="#2c3548";ig.strokeRect(ex+10+i*66,38,52,58);
+    const e=S.eng[i]||{running:false,n2:0,lit:false,egt:0};
+    const starting=!e.running&&e.n2>0.01;
+    const val=powered?(e.running?S.n1:e.n2):0;
+    const bx=ex+10+i*58;
+    ig.fillStyle="#161c28";ig.fillRect(bx,38,40,58);
+    ig.fillStyle=e.running?(val>0.95?"#ff8080":"#59d98c"):(starting?"#e0a53a":"#2a3348");
+    ig.fillRect(bx,38+58*(1-val),40,58*val);
+    ig.strokeStyle="#2c3548";ig.strokeRect(bx,38,40,58);
+    /* EGT/ITT tick */
+    if(powered&&e.lit){ig.fillStyle="#ff7a4a";ig.fillRect(bx+42,38+58*(1-e.egt),4,58*e.egt);}
     ig.fillStyle="#dfe6f0";ig.font="700 12px Consolas";ig.textAlign="center";
-    ig.fillText(on?Math.round(val*100):"--",ex+36+i*66,110);
-    ig.fillStyle="#5a6478";ig.font="8px Consolas";
-    ig.fillText("ENG "+(i+1),ex+36+i*66,124);
+    ig.fillText(powered?Math.round(val*100):"--",bx+20,112);
+    ig.fillStyle=starting?"#e0a53a":"#5a6478";ig.font="8px Consolas";
+    ig.fillText(starting?"START":("ENG "+(i+1)),bx+20,124);
   }
   /* fuel bar */
-  ig.fillStyle="#5a6478";ig.font="9px Consolas";ig.textAlign="left";ig.fillText("FUEL",ex+156,32);
-  ig.fillStyle="#161c28";ig.fillRect(ex+156,38,20,58);
+  const fbx=ex+10+nEng*58+8;
+  ig.fillStyle="#5a6478";ig.font="9px Consolas";ig.textAlign="left";ig.fillText("FUEL",fbx,32);
+  ig.fillStyle="#161c28";ig.fillRect(fbx,38,18,58);
   ig.fillStyle=S.fuel<20?"#ff8080":"#5fd4d0";
-  ig.fillRect(ex+156,38+58*(1-S.fuel/100),20,58*(S.fuel/100));
-  ig.strokeStyle="#2c3548";ig.strokeRect(ex+156,38,20,58);
-  /* config readouts */
+  ig.fillRect(fbx,38+58*(1-S.fuel/100),18,58*(S.fuel/100));
+  ig.strokeStyle="#2c3548";ig.strokeRect(fbx,38,18,58);
+  /* config + systems readouts */
+  const rx=fbx+26;
   ig.fillStyle="#9aa6bd";ig.font="10px Consolas";ig.textAlign="left";
-  ig.fillText("FLAPS "+S.flaps+"/3",ex+156,116);
-  ig.fillText("GEAR "+(S.gear?"DN":"UP"),ex+156,130);
-  ig.fillText("THR "+Math.round(S.throttle*100)+"%",ex+156,144);
+  ig.fillText("FLAPS "+S.flaps+"/3",rx,44);
+  ig.fillText("GEAR "+(S.gear?"DN":"UP"),rx,58);
+  ig.fillText("THR "+Math.round(S.throttle*100)+"%",rx,72);
+  ig.fillStyle=PWR.elec?"#59d98c":"#ff8080";ig.fillText("ELEC "+(PWR.elec?"ON":"OFF"),rx,86);
+  if(AC.apu){ig.fillStyle=S.apu.state==="avail"?"#59d98c":(S.apu.state==="start"?"#e0a53a":"#5a6478");
+    ig.fillText("APU "+(S.apu.state==="avail"?"AVAIL":S.apu.state==="start"?Math.round(S.apu.spool*100)+"%":"OFF"),rx,100);}
+  else if(AC.type==="jet"){ig.fillStyle=PWR.bleed?"#59d98c":"#5a6478";ig.fillText("BLEED "+(PWR.bleed?"ON":"OFF"),rx,100);}
   if(!powered){
     ig.fillStyle="#3a4356";ig.font="10px Consolas";ig.textAlign="center";
-    ig.fillText("PANEL UNPOWERED — BATTERY + AVIONICS",480,160);
+    ig.fillText("PANEL UNPOWERED — POWER + AVIONICS",470,160);
   }
 }
 
@@ -1227,14 +1454,14 @@ function updateCamera(dt){
 let blinkT=0;
 function lampsTick(dt){
   blinkT+=dt;
-  const beaconOn=SYS.bat&&SYS.beacon&&(blinkT%1.1<0.12);
-  const strobeOn=SYS.bat&&SYS.strobe&&((blinkT%1.6<0.06)||(blinkT%1.6>0.14&&blinkT%1.6<0.2));
+  const beaconOn=PWR.elec&&SYS.beacon&&(blinkT%1.1<0.12);
+  const strobeOn=PWR.elec&&SYS.strobe&&((blinkT%1.6<0.06)||(blinkT%1.6>0.14&&blinkT%1.6<0.2));
   lampBeacon.material.opacity=beaconOn?1:0;
   lampStrobeL.material.opacity=strobeOn?1:0;
   lampStrobeR.material.opacity=strobeOn?1:0;
-  const navOn=SYS.bat&&SYS.nav;
+  const navOn=PWR.elec&&SYS.nav;
   lampNavL.material.opacity=navOn?0.95:0;lampNavR.material.opacity=navOn?0.95:0;lampTail.material.opacity=navOn?0.8:0;
-  landSpot.intensity=(SYS.bat&&SYS.landing)?(ENV.time==="night"?3.2:1.1):0;
+  landSpot.intensity=(PWR.elec&&SYS.landing)?(ENV.time==="night"?3.2:1.1):0;
   gearGrp.visible=S.gear;
   for(const d of propDiscs){d.rotation.z+=S.n1*40*dt;d.material.opacity=0.05+S.n1*0.16;}
 }
@@ -1357,6 +1584,8 @@ document.getElementById("btnMap").onclick=toggleMap;
 document.getElementById("btnPause").onclick=togglePause;
 document.getElementById("btnTime").onclick=cycleAccel;
 document.getElementById("btnHelp").onclick=()=>{document.getElementById("help").style.display="flex";};
+document.getElementById("btnGuide").onclick=guideToggle;
+document.getElementById("guideX").onclick=guideToggle;
 document.getElementById("btnQuit").onclick=()=>location.reload();
 
 /* ---------------- START SCREEN ---------------- */
@@ -1404,24 +1633,30 @@ function startFlight(coldDark){
   if(AU&&AU.ctx.state==="suspended")AU.ctx.resume();
   buildWorld();
   buildAircraft();
-  buildSwitches();
   applyEnv();
   S.coldDark=coldDark;
   S.x=0;S.z=-80;S.alt=0;S.hdg=0;S.pitch=0;S.roll=0;S.spd=0;S.vspd=0;
   S.onGround=true;S.gear=true;S.flaps=0;S.throttle=0;S.fuel=100;S.elapsed=0;
+  S.crashed=false;S.tdRate=0;S.stalled=false;S.ovspd=false;S.pitotIce=false;
+  S.paused=false;S.tAccel=1;S.flavorT=undefined;S.flags={};
+  document.getElementById("debrief").style.display="none";
+  resetSystems();
+  buildSwitches();
+  GUIDE.active=false;
+  document.getElementById("guide").style.display="none";
+  document.getElementById("checklist").style.display="none";
   if(!coldDark){
-    SYS.bat=1;SYS.avionics=1;SYS.pumpL=1;SYS.pumpR=1;SYS.eng1=1;SYS.eng2=AC.engines>1?1:0;
-    SYS.beacon=1;SYS.nav=1;SYS.strobe=1;SYS.belts=1;SYS.pitot=1;
-    SYS.landing=(ENV.time!=="day")?1:0;
+    setWarmSystems();
     S.n1=0.22;S.flaps=1;
+    cpEl.style.top="130px";
+    document.getElementById("ovhd").style.display="none";
   }else{
-    for(const k of ["bat","apu","avionics","pumpL","pumpR","eng1","eng2","beacon","nav","strobe","landing","taxi","pitot","antiice","belts"])SYS[k]=0;
     S.n1=0;
-    document.getElementById("checklist").style.display="block";
     document.getElementById("ovhd").style.display="block";
     cpEl.style.top="330px";
-    ckUpdate();
+    guideStart();
   }
+  updateSystems(0);
   refreshSwitchUI();
   document.getElementById("start").style.display="none";
   document.getElementById("hud").style.display="block";
@@ -1430,7 +1665,7 @@ function startFlight(coldDark){
   setPhase("READY");
   const wxNote={clear:"CAVOK, winds calm",rain:"rain, wet runway",storm:"storm cells in the area — expect chop",fog:"low visibility, trust the gauges"}[ENV.wx];
   if(coldDark){
-    copilot("Cold and dark on stand. Work the OVERHEAD PANEL: battery first. I'll keep the checklist up.",true);
+    copilot("Cold and dark on stand. Follow the GUIDED STARTUP panel on the left — I'll glow the exact switch to touch on the overhead and tick each step as you go.",true);
   }else{
     copilot("Welcome aboard, Captain. "+RT.fc+" to "+RT.tc+", "+RT.nm+" miles. "+wxNote+". Cleared for takeoff — Vr is "+AC.vr+" knots.",true);
     say("Welcome aboard. Cleared for takeoff.");
@@ -1476,6 +1711,8 @@ function loop(){
   if(S.phase==="MENU")return;
   if(!S.paused&&!S.crashed&&S.phase!=="SHUTDOWN"){
     const sdt=dt*S.tAccel;
+    updateSystems(sdt);
+    guideTick();
     S.elapsed+=sdt;
     controlsTick(dt);
     autopilot(sdt);
@@ -1488,7 +1725,7 @@ function loop(){
         g.gain.exponentialRampToValueAtTime(0.001,AU.ctx.currentTime+1.8);
         o.connect(g);g.connect(AU.master);o.start(AU.ctx.currentTime+0.3);o.stop(AU.ctx.currentTime+2);}}
     S.flashT=Math.max(0,S.flashT-dt*1.4);
-  }
+  }else updateSystems(0);
   lampsTick(dt);
   updateCamera(dt);
   /* rain follows camera */
@@ -1530,8 +1767,14 @@ window.__FLIGHT={
   set:(patch)=>{Object.assign(S,patch);},
   env:(time,wx)=>{if(time)ENV.time=time;if(wx)ENV.wx=wx;applyEnv();},
   view:setView,
-  step:(dt,n)=>{for(let i=0;i<n&&!S.crashed&&S.phase!=="SHUTDOWN";i++){S.elapsed+=dt;autopilot(dt);physics(dt);phaseLogic();}},
-  tele:()=>({phase:S.phase,spd:Math.round(S.spd),altFt:Math.round(S.alt/FT2M),hdg:Math.round(S.hdg),n1:+S.n1.toFixed(2),fuel:+S.fuel.toFixed(1),onGround:S.onGround,view:VIEWS[S.view],remNm:+remainingNm().toFixed(1)})
+  sys:(k,v)=>{SYS[k]=(v===undefined?1:v);refreshSwitchUI();},
+  guideState:()=>({active:GUIDE.active,idx:GUIDE.idx,total:GUIDE.steps.length,next:GUIDE.steps[GUIDE.idx]&&GUIDE.steps[GUIDE.idx].tip}),
+  apuState:()=>({state:S.apu.state,spool:+S.apu.spool.toFixed(2)}),
+  engines:()=>S.eng.map(e=>({run:e.running,n2:+e.n2.toFixed(2)})),
+  pwr:()=>({elec:PWR.elec,avionics:PWR.avionics,bleed:PWR.bleed}),
+  panelKeys:()=>SYSDEF[curAcId()].panels.flatMap(g=>g.items.map(it=>it.k)),
+  step:(dt,n)=>{for(let i=0;i<n&&!S.crashed&&S.phase!=="SHUTDOWN";i++){updateSystems(dt);guideTick();S.elapsed+=dt;autopilot(dt);physics(dt);phaseLogic();}},
+  tele:()=>({phase:S.phase,spd:Math.round(S.spd),altFt:Math.round(S.alt/FT2M),hdg:Math.round(S.hdg),n1:+S.n1.toFixed(2),fuel:+S.fuel.toFixed(1),onGround:S.onGround,view:VIEWS[S.view],remNm:+remainingNm().toFixed(1),elec:PWR.elec,running:enginesRunning()})
 };
 </script>
 </body>
