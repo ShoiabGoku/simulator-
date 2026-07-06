@@ -679,54 +679,141 @@ function lampSprite(color,s){
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false}));
   sp.scale.set(s,s,1);return sp;
 }
+/* per-aircraft exterior geometry (units are multiples of AC.size) */
+const GEO={
+  c172:{fusL:15,fusR:0.85,noseZ:1.3,span:21,chord:3.0,sweep:0,dih:0.03,wingY:1.1,wingZ:-1.0,
+    tail:"conv",finH:3.4,finCh:2.2,hstSpan:7.4,strut:1,pants:1},
+  q400:{fusL:23,fusR:0.95,noseZ:1.7,span:25,chord:2.9,sweep:0.05,dih:0.02,wingY:1.0,wingZ:-0.6,
+    tail:"T",finH:5.2,finCh:3.2,hstSpan:8,nacProps:1,stripe:1},
+  a320:{fusL:20,fusR:1.15,noseZ:1.9,span:23,chord:3.5,sweep:0.42,dih:0.10,wingY:-0.6,wingZ:-0.2,
+    tail:"conv",finH:4.8,finCh:3.0,hstSpan:8.4,winglet:1.4,pods:[0.32],stripe:1},
+  b787:{fusL:25,fusR:1.1,noseZ:2.6,span:29,chord:3.7,sweep:0.58,dih:0.13,wingY:-0.55,wingZ:0.3,
+    tail:"conv",finH:4.4,finCh:3.0,hstSpan:9,winglet:0.8,wingletBack:1,pods:[0.32],podR:1.0,stripe:1},
+  b744:{fusL:27,fusR:1.3,noseZ:1.6,span:29,chord:4.2,sweep:0.5,dih:0.08,wingY:-0.7,wingZ:0.5,
+    tail:"conv",finH:6.2,finCh:3.6,hstSpan:10,winglet:1.6,pods:[0.3,0.56],hump:1,stripe:1},
+  conc:{fusL:27,fusR:0.72,noseZ:2,span:14,chord:8.5,sweep:0.72,dih:0,wingY:-0.35,wingZ:3.4,
+    tail:"none",finH:4.6,finCh:3.4,needle:1,strake:1,concEng:1},
+  f16:{fusL:13.5,fusR:0.8,noseZ:2.2,span:9.5,chord:3.4,sweep:0.5,dih:0,wingY:0,wingZ:0.8,
+    tail:"f16",finH:3.4,finCh:2.2,hstSpan:6.6,canopy:1,intake:1,strake:1}
+};
 function buildAircraft(){
   if(model)acGroup.remove(model);
   model=new THREE.Group();propDiscs=[];
   const s=AC.size;
+  const G=GEO[curAcId()]||GEO.a320;
   const white=new THREE.MeshLambertMaterial({color:0xe8eaee});
   const dark=new THREE.MeshLambertMaterial({color:0x22262e});
   const tailM=new THREE.MeshLambertMaterial({color:AC.tail});
   const wingM=new THREE.MeshLambertMaterial({color:0xd0d4da});
+  const halfL=s*G.fusL/2;
   /* fuselage */
-  const fus=new THREE.Mesh(new THREE.CylinderGeometry(s*1.15,s*1.15,s*20,14),white);
+  const fus=new THREE.Mesh(new THREE.CylinderGeometry(s*G.fusR,s*G.fusR,s*G.fusL,14),white);
   fus.rotation.x=Math.PI/2;model.add(fus);
-  const nose=new THREE.Mesh(new THREE.SphereGeometry(s*1.15,12,10),white);
-  nose.position.z=-s*10;nose.scale.z=1.9;model.add(nose);
-  const tailCone=new THREE.Mesh(new THREE.ConeGeometry(s*1.12,s*5,12),white);
-  tailCone.rotation.x=-Math.PI/2;tailCone.position.z=s*12.2;model.add(tailCone);
-  /* cockpit glass */
-  const glass=new THREE.Mesh(new THREE.BoxGeometry(s*1.6,s*0.55,s*1.7),dark);
-  glass.position.set(0,s*0.85,-s*8.6);model.add(glass);
-  /* wings */
-  const highWing=AC.type==="prop"&&AC.engines===1;
-  const wy=highWing?s*1.05:-s*0.55;
-  const wing=new THREE.Mesh(new THREE.BoxGeometry(s*23,s*0.28,s*3.2),wingM);
-  wing.position.set(0,wy,-s*0.4);model.add(wing);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(s*G.fusR,12,10),white);
+  nose.position.z=-halfL;nose.scale.z=G.noseZ;model.add(nose);
+  const tailCone=new THREE.Mesh(new THREE.ConeGeometry(s*G.fusR*0.97,s*4.5,12),white);
+  tailCone.rotation.x=-Math.PI/2;tailCone.position.z=halfL+s*2.1;model.add(tailCone);
+  if(G.needle){ /* Concorde droop nose probe */
+    const nd=new THREE.Mesh(new THREE.ConeGeometry(s*G.fusR*0.9,s*6,10),white);
+    nd.rotation.x=-Math.PI/2;nd.position.z=-halfL-s*2.6;model.add(nd);
+  }
+  if(G.hump){ /* 747 upper deck */
+    const hp=new THREE.Mesh(new THREE.CylinderGeometry(s*G.fusR*0.72,s*G.fusR*0.72,s*7.5,12),white);
+    hp.rotation.x=Math.PI/2;hp.position.set(0,s*G.fusR*0.72,-halfL*0.45);model.add(hp);
+    const hpn=new THREE.Mesh(new THREE.SphereGeometry(s*G.fusR*0.72,10,8),white);
+    hpn.position.set(0,s*G.fusR*0.72,-halfL*0.45-s*3.75);hpn.scale.z=1.8;model.add(hpn);
+  }
+  if(G.stripe){ /* cheatline + window band */
+    const st=new THREE.Mesh(new THREE.BoxGeometry(s*G.fusR*2.05,s*0.16,s*G.fusL*0.78),tailM);
+    st.position.y=s*G.fusR*0.15;model.add(st);
+    const wb=new THREE.Mesh(new THREE.BoxGeometry(s*G.fusR*2.05,s*0.12,s*G.fusL*0.66),dark);
+    wb.position.y=s*G.fusR*0.48;model.add(wb);
+  }
+  /* cockpit glass / canopy */
+  if(G.canopy){
+    const can=new THREE.Mesh(new THREE.SphereGeometry(s*1.0,12,10),
+      new THREE.MeshLambertMaterial({color:0x1e3242,transparent:true,opacity:0.9}));
+    can.scale.set(0.62,0.55,1.6);can.position.set(0,s*G.fusR*0.8,-halfL*0.5);model.add(can);
+  }else{
+    const glass=new THREE.Mesh(new THREE.BoxGeometry(s*G.fusR*1.4,s*0.5,s*1.6),dark);
+    glass.position.set(0,s*G.fusR*0.72,-halfL*0.84);model.add(glass);
+  }
+  /* wings: two halves with sweep + dihedral */
+  const wy=s*G.wingY, wz=s*G.wingZ, spanH=s*G.span/2;
+  function wingHalf(side){
+    const g=new THREE.Group();
+    g.position.set(0,wy,wz);
+    g.rotation.z=side*G.dih;g.rotation.y=-side*G.sweep;
+    const m=new THREE.Mesh(new THREE.BoxGeometry(spanH,s*0.22,s*G.chord),wingM);
+    m.position.x=side*spanH/2;g.add(m);
+    if(G.winglet){
+      const wl=new THREE.Mesh(new THREE.BoxGeometry(s*0.16,s*G.winglet,s*G.chord*0.4),tailM);
+      wl.position.set(side*spanH,s*G.winglet/2,s*G.chord*0.18);
+      if(G.wingletBack)wl.rotation.x=-0.5;
+      wl.rotation.z=-side*0.35;g.add(wl);
+    }
+    model.add(g);return g;
+  }
+  const wingL=wingHalf(-1),wingR=wingHalf(1);
+  if(G.strake){ /* inner high-sweep strakes (Concorde ogive / F-16 LERX) */
+    for(const side of [-1,1]){
+      const g=new THREE.Group();
+      g.position.set(0,wy,wz-s*G.chord*0.55);
+      g.rotation.y=-side*(G.sweep+0.5);
+      const m=new THREE.Mesh(new THREE.BoxGeometry(spanH*0.55,s*0.18,s*G.chord*0.7),wingM);
+      m.position.x=side*spanH*0.27;g.add(m);model.add(g);
+    }
+  }
+  if(G.strut){ /* Cessna wing struts */
+    for(const side of [-1,1]){
+      const p1=new THREE.Vector3(side*s*0.85,-s*0.15,wz+s*0.3),
+            p2=new THREE.Vector3(side*s*4.4,wy-s*0.1,wz+s*0.2);
+      const d=new THREE.Vector3().subVectors(p2,p1);
+      const tube=new THREE.Mesh(new THREE.CylinderGeometry(s*0.07,s*0.07,d.length(),6),dark);
+      tube.position.copy(p1).addScaledVector(d,0.5);
+      tube.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize());
+      model.add(tube);
+    }
+  }
   /* tail */
-  const fin=new THREE.Mesh(new THREE.BoxGeometry(s*0.24,s*4.4,s*2.6),tailM);
-  fin.position.set(0,s*2.6,s*11);model.add(fin);
-  const hst=new THREE.Mesh(new THREE.BoxGeometry(s*8.4,s*0.2,s*2),wingM);
-  hst.position.set(0,s*0.5,s*11.2);model.add(hst);
-  /* ---- movable control surfaces (hinged groups) ---- */
+  const tailZ=halfL*0.9;
+  const finBase=s*G.fusR*0.5;
+  const fin=new THREE.Mesh(new THREE.BoxGeometry(s*0.24,s*G.finH,s*G.finCh),tailM);
+  fin.position.set(0,finBase+s*G.finH/2,tailZ);fin.rotation.x=-0.12;model.add(fin);
+  let hstY=finBase+s*0.1, hstZ=tailZ+s*0.2;
+  if(G.tail==="T"){hstY=finBase+s*G.finH;hstZ=tailZ+s*G.finCh*0.35;}
+  if(G.tail!=="none"){
+    const hst=new THREE.Mesh(new THREE.BoxGeometry(s*G.hstSpan,s*0.18,s*G.finCh*0.62),wingM);
+    hst.position.set(0,hstY,hstZ);model.add(hst);
+  }
+  /* ---- movable control surfaces (hinged groups on the wing halves) ---- */
   ctrlSurf={};
   const surfM=new THREE.MeshLambertMaterial({color:0xaab2bc});
-  function hingedSurf(w,t,chord,x,y,z){
-    const g=new THREE.Group();g.position.set(x,y,z);
-    const m=new THREE.Mesh(new THREE.BoxGeometry(w,t,chord),surfM);
-    m.position.z=chord/2; /* surface trails behind the hinge line */
-    g.add(m);model.add(g);return g;
+  function wingSurf(halfGrp,side,frac,len,chord){
+    const g=new THREE.Group();
+    g.position.set(side*spanH*frac,0,s*G.chord/2); /* hinge on the trailing edge */
+    const m=new THREE.Mesh(new THREE.BoxGeometry(len,s*0.09,chord),surfM);
+    m.position.z=chord/2;g.add(m);halfGrp.add(g);return g;
   }
-  const wte=-s*0.4+s*1.6; /* wing trailing edge */
-  ctrlSurf.ailL=hingedSurf(s*4.6,s*0.1,s*0.95,-s*8.6,wy,wte);
-  ctrlSurf.ailR=hingedSurf(s*4.6,s*0.1,s*0.95, s*8.6,wy,wte);
-  ctrlSurf.flapL=hingedSurf(s*4.6,s*0.1,s*1.1,-s*3.4,wy-s*0.03,wte);
-  ctrlSurf.flapR=hingedSurf(s*4.6,s*0.1,s*1.1, s*3.4,wy-s*0.03,wte);
-  ctrlSurf.elev=hingedSurf(s*7.8,s*0.09,s*0.85,0,s*0.5,s*12.2);
+  ctrlSurf.ailL=wingSurf(wingL,-1,0.72,spanH*0.4,s*0.9);
+  ctrlSurf.ailR=wingSurf(wingR,1,0.72,spanH*0.4,s*0.9);
+  if(G.tail==="none"){ /* Concorde: elevons inboard, no flaps */
+    ctrlSurf.elev=wingSurf(wingL,-1,0.3,spanH*0.42,s*1.1);
+    ctrlSurf.elevR=wingSurf(wingR,1,0.3,spanH*0.42,s*1.1);
+    ctrlSurf.flapL=new THREE.Group();ctrlSurf.flapR=new THREE.Group();
+  }else{
+    ctrlSurf.flapL=wingSurf(wingL,-1,0.34,spanH*0.42,s*1.1);
+    ctrlSurf.flapR=wingSurf(wingR,1,0.34,spanH*0.42,s*1.1);
+    const eg=new THREE.Group();eg.position.set(0,hstY,hstZ+s*G.finCh*0.31);
+    const em=new THREE.Mesh(new THREE.BoxGeometry(s*G.hstSpan*0.92,s*0.08,s*0.8),surfM);
+    em.position.z=s*0.4;eg.add(em);model.add(eg);
+    ctrlSurf.elev=eg;
+  }
   /* rudder hinges about the vertical axis */
-  const rudG=new THREE.Group();rudG.position.set(0,s*2.7,s*12.3);
-  const rudMesh=new THREE.Mesh(new THREE.BoxGeometry(s*0.14,s*3.4,s*0.95),
+  const rudG=new THREE.Group();rudG.position.set(0,finBase+s*G.finH*0.5,tailZ+s*G.finCh*0.52);
+  const rudMesh=new THREE.Mesh(new THREE.BoxGeometry(s*0.14,s*G.finH*0.82,s*0.9),
     new THREE.MeshLambertMaterial({color:AC.tail}));
-  rudMesh.position.z=s*0.48;rudG.add(rudMesh);model.add(rudG);
+  rudMesh.position.z=s*0.45;rudG.add(rudMesh);model.add(rudG);
   ctrlSurf.rud=rudG;
   /* engines */
   burners=[];
@@ -734,28 +821,48 @@ function buildAircraft(){
     const b=lampSprite("rgba(120,180,255,0.9)",s*2.2);
     b.position.set(x,y,z);b.material.opacity=0;model.add(b);burners.push(b);
   }
-  if(AC.type==="jet"){
-    if(AC.engines===1){ /* fighter: single tail nozzle */
-      const noz=new THREE.Mesh(new THREE.CylinderGeometry(s*0.75,s*0.6,s*3.2,14),dark);
-      noz.rotation.x=Math.PI/2;noz.position.set(0,0,s*8.5);model.add(noz);
-      if(AC.reheat)addBurner(0,0,s*11);
-    }else{
-      const xs=AC.engines===4?[-7.4,-3.9,3.9,7.4]:[-4.4,4.4];
-      for(const exx of xs){
-        const en=new THREE.Mesh(new THREE.CylinderGeometry(s*0.85,s*0.85,s*2.6,12),dark);
-        en.rotation.x=Math.PI/2;en.position.set(exx*s,wy-s*1.05,-s*1.4);model.add(en);
-        if(AC.reheat)addBurner(exx*s,wy-s*1.05,s*0.3);
-      }
+  function propAt(x,y,z,r){
+    const spin=new THREE.Mesh(new THREE.ConeGeometry(s*0.45,s*1.1,10),dark);
+    spin.rotation.x=-Math.PI/2;spin.position.set(x,y,z);model.add(spin);
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(r,20),
+      new THREE.MeshBasicMaterial({color:0x99a0aa,transparent:true,opacity:0.14,side:THREE.DoubleSide}));
+    disc.position.set(x,y,z-s*0.45);model.add(disc);propDiscs.push(disc);
+  }
+  if(G.intake){ /* F-16: single nozzle + chin intake */
+    const noz=new THREE.Mesh(new THREE.CylinderGeometry(s*0.72,s*0.58,s*3.0,14),dark);
+    noz.rotation.x=Math.PI/2;noz.position.set(0,0,halfL+s*2.6);model.add(noz);
+    const inta=new THREE.Mesh(new THREE.BoxGeometry(s*0.95,s*0.7,s*2.6),dark);
+    inta.position.set(0,-s*G.fusR*0.85,-s*1.2);model.add(inta);
+    if(AC.reheat)addBurner(0,0,halfL+s*4.4);
+  }else if(G.concEng){ /* Concorde: paired engine boxes under the delta */
+    for(const side of [-1,1]){
+      const box=new THREE.Mesh(new THREE.BoxGeometry(s*1.7,s*0.95,s*4.6),dark);
+      box.position.set(side*s*2.5,wy-s*0.6,wz+s*2.2);model.add(box);
+      if(AC.reheat){addBurner(side*s*2.5-s*0.45,wy-s*0.6,wz+s*4.7);
+        addBurner(side*s*2.5+s*0.45,wy-s*0.6,wz+s*4.7);}
     }
-  }else{
-    const positions=AC.engines===1?[[0,0,-s*11.6]]:[[-s*4.2,wy,-s*1.6],[s*4.2,wy,-s*1.6]];
-    for(const p of positions){
-      const spin=new THREE.Mesh(new THREE.ConeGeometry(s*0.5,s*1.2,10),dark);
-      spin.rotation.x=-Math.PI/2;spin.position.set(p[0],p[1],p[2]);model.add(spin);
-      const disc=new THREE.Mesh(new THREE.CircleGeometry(s*2.4,20),
-        new THREE.MeshBasicMaterial({color:0x99a0aa,transparent:true,opacity:0.14,side:THREE.DoubleSide}));
-      disc.position.set(p[0],p[1],p[2]-s*0.5);model.add(disc);propDiscs.push(disc);
+  }else if(G.nacProps){ /* Q400: big wing nacelles + 6-blade props */
+    for(const side of [-1,1]){
+      const x=side*s*G.span*0.26;
+      const nac=new THREE.Mesh(new THREE.CylinderGeometry(s*0.72,s*0.72,s*3.8,12),white);
+      nac.rotation.x=Math.PI/2;nac.position.set(x,wy-s*0.15,wz-s*0.4);model.add(nac);
+      const blg=new THREE.Mesh(new THREE.BoxGeometry(s*0.9,s*0.9,s*2.2),dark);
+      blg.position.set(x,wy-s*0.75,wz+s*0.3);model.add(blg);
+      propAt(x,wy-s*0.15,wz-s*2.4,s*2.5);
     }
+  }else if(G.pods){ /* underwing turbofan pods (2 or 4) */
+    const pr=s*(G.podR||0.85);
+    for(const frac of G.pods)for(const side of [-1,1]){
+      const x=side*s*G.span*frac*0.5*Math.cos(G.sweep)*2;
+      const y=wy+Math.sin(G.dih)*Math.abs(x)-pr-s*0.3;
+      const z=wz+Math.sin(G.sweep)*Math.abs(x)*0.85-s*1.7;
+      const en=new THREE.Mesh(new THREE.CylinderGeometry(pr,pr,s*2.8,12),dark);
+      en.rotation.x=Math.PI/2;en.position.set(x,y,z);model.add(en);
+      const lip=new THREE.Mesh(new THREE.CylinderGeometry(pr*1.08,pr*1.08,s*0.4,12),white);
+      lip.rotation.x=Math.PI/2;lip.position.set(x,y,z-s*1.35);model.add(lip);
+    }
+  }else{ /* single piston: nose prop */
+    propAt(0,0,-halfL-s*1.0,s*2.3);
   }
   /* gear */
   gearGrp=new THREE.Group();
@@ -767,17 +874,23 @@ function buildAircraft(){
     st.position.y=-s*0.8;g.add(st);
     const wh=new THREE.Mesh(new THREE.CylinderGeometry(s*0.5,s*0.5,s*0.34,12),tyre);
     wh.rotation.z=Math.PI/2;wh.position.y=-s*1.6;g.add(wh);
+    if(G.pants){
+      const pt=new THREE.Mesh(new THREE.BoxGeometry(s*0.42,s*0.62,s*1.25),white);
+      pt.position.y=-s*1.5;g.add(pt);
+    }
     g.position.set(x,-s*0.9,z);return g;
   }
-  gearGrp.add(leg(0,-s*7.5),leg(-s*2.2,s*0.6),leg(s*2.2,s*0.6));
+  const mainX=s*(G.span<12?1.5:2.2);
+  gearGrp.add(leg(0,-halfL*0.72),leg(-mainX,s*0.8),leg(mainX,s*0.8));
   model.add(gearGrp);
-  /* exterior lamps */
-  lampBeacon=lampSprite("rgba(255,40,40,0.9)",s*2.4);lampBeacon.position.set(0,s*1.6,s*1.5);model.add(lampBeacon);
-  lampNavL=lampSprite("rgba(255,60,60,0.9)",s*1.6);lampNavL.position.set(-s*11.5,wy,-s*0.4);model.add(lampNavL);
-  lampNavR=lampSprite("rgba(60,255,90,0.9)",s*1.6);lampNavR.position.set(s*11.5,wy,-s*0.4);model.add(lampNavR);
-  lampStrobeL=lampSprite("rgba(255,255,255,1)",s*2.6);lampStrobeL.position.set(-s*11.5,wy,-s*0.2);model.add(lampStrobeL);
-  lampStrobeR=lampSprite("rgba(255,255,255,1)",s*2.6);lampStrobeR.position.set(s*11.5,wy,-s*0.2);model.add(lampStrobeR);
-  lampTail=lampSprite("rgba(255,255,255,0.9)",s*1.4);lampTail.position.set(0,s*1.2,s*13.5);model.add(lampTail);
+  /* exterior lamps at the real wingtips */
+  const tipX=Math.cos(G.sweep)*spanH, tipY=wy+Math.sin(G.dih)*spanH, tipZ=wz+Math.sin(G.sweep)*spanH;
+  lampBeacon=lampSprite("rgba(255,40,40,0.9)",s*2.4);lampBeacon.position.set(0,s*G.fusR+s*0.45,s*1.2);model.add(lampBeacon);
+  lampNavL=lampSprite("rgba(255,60,60,0.9)",s*1.6);lampNavL.position.set(-tipX,tipY,tipZ);model.add(lampNavL);
+  lampNavR=lampSprite("rgba(60,255,90,0.9)",s*1.6);lampNavR.position.set(tipX,tipY,tipZ);model.add(lampNavR);
+  lampStrobeL=lampSprite("rgba(255,255,255,1)",s*2.6);lampStrobeL.position.set(-tipX,tipY,tipZ+s*0.25);model.add(lampStrobeL);
+  lampStrobeR=lampSprite("rgba(255,255,255,1)",s*2.6);lampStrobeR.position.set(tipX,tipY,tipZ+s*0.25);model.add(lampStrobeR);
+  lampTail=lampSprite("rgba(255,255,255,0.9)",s*1.4);lampTail.position.set(0,finBase+s*G.finH+s*0.2,tailZ+s*1.5);model.add(lampTail);
   landSpot=new THREE.SpotLight(0xfff4d8,0,900,0.35,0.5,1.2);
   landSpot.position.set(0,-s*0.5,-s*9);
   const tgt=new THREE.Object3D();tgt.position.set(0,-s*6,-s*80);model.add(tgt);
@@ -2100,8 +2213,9 @@ function surfacesTick(dt){
   /* roll right → right aileron up, left aileron down */
   ctrlSurf.ailL.rotation.x= SURF.r*0.38;
   ctrlSurf.ailR.rotation.x=-SURF.r*0.38;
-  /* pull → elevator trailing edge up */
+  /* pull → elevator trailing edge up (elevR = Concorde's right elevon) */
   ctrlSurf.elev.rotation.x=-SURF.p*0.32;
+  if(ctrlSurf.elevR)ctrlSurf.elevR.rotation.x=-SURF.p*0.32;
   ctrlSurf.rud.rotation.y=-SURF.y*0.4;
   ctrlSurf.flapL.rotation.x=SURF.f*0.6;
   ctrlSurf.flapR.rotation.x=SURF.f*0.6;
