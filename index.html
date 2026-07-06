@@ -210,6 +210,7 @@
     <span>IAS <b id="tbIas">0</b> kt</span>
     <span>ALT <b id="tbAlt">0</b> ft</span>
     <span>HDG <b id="tbHdg">000</b>&deg;</span>
+    <span>BRG <b id="tbBrg">---</b>&deg;</span>
     <span>DIST <b id="tbDist">--</b> nm</span>
     <span>ETE <b id="tbEte">--</b></span><span class="sep">|</span>
     <span>VIEW <b id="tbView">COCKPIT</b></span>
@@ -229,6 +230,8 @@
     <div class="ann" id="anFlaps">FLAPS 0</div>
     <div class="ann" id="anAp">AP</div>
     <div class="ann" id="anBrk">BRAKES</div>
+    <div class="ann" id="anSpd">SPD BRK</div>
+    <div class="ann" id="anPark">PARK</div>
     <div class="ann" id="anFuel">FUEL</div>
     <div class="ann" id="anPitot">PITOT ICE</div>
   </div>
@@ -259,6 +262,15 @@
           <button class="cbtn" id="flapUp">FLAP&minus;</button>
         </div>
         <button class="cbtn" id="brakeBtn">BRAKES [B]</button>
+        <div class="btnrow">
+          <button class="cbtn" id="spdBrkBtn">SPDBRK</button>
+          <button class="cbtn" id="parkBtn">PARK</button>
+        </div>
+        <div class="btnrow">
+          <button class="cbtn" id="abrkBtn">A/BRK</button>
+          <button class="cbtn" id="trimDn">TRM&minus;</button>
+          <button class="cbtn" id="trimUp">TRM+</button>
+        </div>
       </div>
     </div>
     <div id="apPanel">
@@ -281,6 +293,7 @@
       <h3>CONTROLS</h3>
       <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> pitch (push / pull) &nbsp; <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> roll &nbsp; <kbd>A</kbd>/<kbd>D</kbd> rudder<br>
       <kbd>W</kbd>/<kbd>S</kbd> throttle &nbsp; <kbd>F</kbd>/<kbd>R</kbd> flaps extend / retract &nbsp; <kbd>G</kbd> gear &nbsp; <kbd>B</kbd> brakes (hold)<br>
+      <kbd>X</kbd> speedbrake &nbsp; <kbd>,</kbd> parking brake &nbsp; <kbd>[</kbd>/<kbd>]</kbd> pitch trim &nbsp; A/BRK button arms autobrake<br>
       <kbd>C</kbd> or <kbd>1..5</kbd> views: cockpit / cabin / chase / tower / wing<br>
       <kbd>M</kbd> nav map &nbsp; <kbd>T</kbd> time 1-2-4-8x &nbsp; <kbd>P</kbd> pause &nbsp; <kbd>H</kbd> this help<br><br>
       <b style="color:var(--amber)">Cold &amp; dark?</b> The GUIDED STARTUP panel walks you through every step and glows the exact switch to touch on the OVERHEAD PANEL &mdash; battery &rarr; APU &rarr; bleed &rarr; fuel pumps &rarr; engine start, in the right order. Rotary knobs (ENG MODE, IGNITION, CONDITION levers) click to cycle positions. Each aircraft carries its own real systems.<br><br>
@@ -323,17 +336,26 @@ const AIRCRAFT={
   a320:{name:"Airbus A320neo",role:"Narrow-body Jet · 180 pax",type:"jet",engines:2,apu:true,
     vs0:118,vsF:98,vr:140,v1:135,cruise:450,vmax:487,accel:4.6,climb:2400,ceiling:39800,size:2.0,
     burn:0.048,tail:0x16a085,desc:"The world's short-haul workhorse. Calls 'retard' at 20 feet."},
-  b787:{name:"Boeing 787-9 Dreamliner",role:"Wide-body Jet · 290 pax",type:"jet",engines:2,apu:true,estart:true,
+  b787:{name:"Boeing 787-9 Dreamliner",role:"Wide-body Jet · 290 pax",type:"jet",engines:2,apu:true,estart:true,roll:0.85,
     vs0:128,vsF:105,vr:155,v1:148,cruise:488,vmax:516,accel:4.3,climb:2600,ceiling:43000,size:2.7,
-    burn:0.055,tail:0x34495e,desc:"Long legs, raked wingtips, whisper-quiet flight deck."}
+    burn:0.055,tail:0x34495e,desc:"Long legs, raked wingtips, whisper-quiet flight deck."},
+  b744:{name:"Boeing 747-400",role:"Wide-body Quad Jet · 416 pax",type:"jet",engines:4,apu:true,roll:0.7,
+    vs0:130,vsF:108,vr:160,v1:152,cruise:490,vmax:507,accel:4.0,climb:2200,ceiling:45000,size:3.2,
+    burn:0.062,tail:0x8e44ad,desc:"The Queen of the Skies — four engines, the hump, sheer presence."},
+  conc:{name:"Concorde",role:"Supersonic SST · 100 pax",type:"jet",engines:4,apu:true,reheat:true,delta:true,roll:0.9,
+    vs0:160,vsF:150,vr:200,v1:185,cruise:1050,vmax:1330,accel:5.6,climb:3500,ceiling:60000,size:2.5,
+    burn:0.11,tail:0x2c3e50,desc:"Mach 2 on reheat. Droop the nose, light the burners, chase the sun."},
+  f16:{name:"F-16 Fighting Falcon",role:"Multirole Fighter · 1 seat",type:"jet",engines:1,apu:false,jfs:true,reheat:true,roll:2.4,
+    vs0:120,vsF:112,vr:145,v1:0,cruise:480,vmax:1150,accel:9.5,climb:9000,ceiling:55000,size:1.0,
+    burn:0.05,tail:0x3d5a3d,desc:"Fly-by-wire rocket. JFS start, full afterburner, absurd agility."}
 };
 const ROUTES={
-  scenic:{from:"VLC",to:"BAY",fc:"Coastal Field",tc:"Bay Strip",nm:45,desc:"A short scenic coastal hop. Perfect for the Cessna."},
-  jfkbos:{from:"JFK",to:"BOS",fc:"New York JFK",tc:"Boston Logan",nm:161,desc:"The US East-Coast shuttle classic."},
-  sinkul:{from:"SIN",to:"KUL",fc:"Singapore Changi",tc:"Kuala Lumpur",nm:160,desc:"One of the busiest city pairs on Earth."},
-  lhrcdg:{from:"LHR",to:"CDG",fc:"London Heathrow",tc:"Paris Ch. de Gaulle",nm:188,desc:"Cross the Channel; croissants on arrival."},
-  dxbmct:{from:"DXB",to:"MCT",fc:"Dubai Intl",tc:"Muscat",nm:188,desc:"Desert, gulf water, and mountain ridges."},
-  delbom:{from:"DEL",to:"BOM",fc:"Delhi IGI",tc:"Mumbai CSMIA",nm:620,desc:"India's trunk route — the long haul of this sim."}
+  scenic:{from:"VLC",to:"BAY",fc:"Coastal Field",tc:"Bay Strip",nm:45,crs:18,rwyHdg:18,desc:"A short scenic coastal hop; a gentle turn to the right for the field."},
+  jfkbos:{from:"JFK",to:"BOS",fc:"New York JFK",tc:"Boston Logan",nm:161,crs:44,rwyHdg:36,desc:"The US East-Coast shuttle classic — bank right for Boston."},
+  sinkul:{from:"SIN",to:"KUL",fc:"Singapore Changi",tc:"Kuala Lumpur",nm:160,crs:-22,rwyHdg:-16,desc:"One of the busiest city pairs on Earth; a left turn out of Changi."},
+  lhrcdg:{from:"LHR",to:"CDG",fc:"London Heathrow",tc:"Paris Ch. de Gaulle",nm:188,crs:29,rwyHdg:22,desc:"Cross the Channel; croissants on arrival."},
+  dxbmct:{from:"DXB",to:"MCT",fc:"Dubai Intl",tc:"Muscat",nm:188,crs:-31,rwyHdg:-24,desc:"Desert, gulf water and mountain ridges; break left for Muscat."},
+  delbom:{from:"DEL",to:"BOM",fc:"Delhi IGI",tc:"Mumbai CSMIA",nm:620,crs:14,rwyHdg:14,desc:"India's trunk route — the long haul of this sim."}
 };
 const TIMES={
   day:{label:"☀ Day",top:"#4a86c8",bot:"#b8d4ee",sun:1.0,sunCol:0xffffff,amb:0.8,ground:1.0,stars:false,sunY:0.75},
@@ -369,6 +391,7 @@ const S={
   phase:"MENU",view:0,paused:false,tAccel:1,elapsed:0,
   x:0,alt:0,z:-80,spd:0,hdg:0,pitch:0,roll:0,vspd:0,gamma:0,
   n1:0,throttle:0,flaps:0,gear:true,brakes:false,rudder:0,fuel:100,
+  spoiler:false,parkBrake:false,autobrake:false,trim:0,
   onGround:true,stalled:false,ovspd:false,pitotIce:false,crashed:false,
   tdRate:0,flashT:0,shake:0,coldDark:false,
   ap:{on:false,alt:8000,hdg:360,spd:250},
@@ -485,7 +508,7 @@ let water=null;
 
 /* runway builder */
 const rwEdgeLights=[];
-function makeRunway(zc){
+function makeRunway(xc,zc,hdgDeg){
   const grp=new THREE.Group();
   const rw=new THREE.Mesh(new THREE.PlaneGeometry(58,3200),new THREE.MeshLambertMaterial({color:0x2a2c30}));
   rw.rotation.x=-Math.PI/2;rw.position.y=0.02;grp.add(rw);
@@ -506,7 +529,8 @@ function makeRunway(zc){
   lg.setAttribute("position",new THREE.Float32BufferAttribute(pts,3));
   const lights=new THREE.Points(lg,new THREE.PointsMaterial({color:0xffe9a0,size:3.2,sizeAttenuation:true}));
   grp.add(lights);rwEdgeLights.push(lights.material);
-  grp.position.set(0,0,zc);
+  grp.position.set(xc,0,zc);
+  grp.rotation.y=-(hdgDeg||0)*D2R;
   scene.add(grp);
   return grp;
 }
@@ -544,7 +568,8 @@ function makeMountains(){
     const mat=new THREE.MeshLambertMaterial({color:h>2200?0x9aa4ac:0x5d6b52});
     mountainMats.push(mat);
     const cone=new THREE.Mesh(new THREE.ConeGeometry(h*1.6,h,7),mat);
-    cone.position.set(side*(3800+Math.random()*7000), h/2-30, -worldD*(0.18+Math.random()*0.64));
+    const p=pathPoint(0.18+Math.random()*0.64, side*(3800+Math.random()*7000));
+    cone.position.set(p.x, h/2-30, p.z);
     cone.rotation.y=Math.random()*3;
     scene.add(cone);
   }
@@ -567,7 +592,8 @@ function makeClouds(){
     const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tx,transparent:true,opacity:0.75,depthWrite:false}));
     const sc=700+Math.random()*1700;
     sp.scale.set(sc,sc*0.42,1);
-    sp.position.set((Math.random()-0.5)*26000, 1100+Math.random()*2100, -Math.random()*worldD*1.15+2000);
+    const p=pathPoint(Math.random()*1.12, (Math.random()-0.5)*24000);
+    sp.position.set(p.x, 1100+Math.random()*2100, p.z);
     cloudGrp.add(sp);
   }
   scene.add(cloudGrp);
@@ -610,7 +636,7 @@ function makeRain(){
 /* ---------------- AIRCRAFT MODEL ---------------- */
 const acGroup=new THREE.Group();scene.add(acGroup);
 let model=null,gearGrp=null,propDiscs=[],lampBeacon=null,lampStrobeL=null,lampStrobeR=null,
-    lampNavL=null,lampNavR=null,landSpot=null,lampTail=null;
+    lampNavL=null,lampNavR=null,landSpot=null,lampTail=null,burners=[];
 function lampSprite(color,s){
   const c=document.createElement("canvas");c.width=c.height=64;
   const g=c.getContext("2d");
@@ -650,10 +676,23 @@ function buildAircraft(){
   const hst=new THREE.Mesh(new THREE.BoxGeometry(s*8.4,s*0.2,s*2),wingM);
   hst.position.set(0,s*0.5,s*11.2);model.add(hst);
   /* engines */
+  burners=[];
+  function addBurner(x,y,z){
+    const b=lampSprite("rgba(120,180,255,0.9)",s*2.2);
+    b.position.set(x,y,z);b.material.opacity=0;model.add(b);burners.push(b);
+  }
   if(AC.type==="jet"){
-    for(const sx of [-1,1]){
-      const en=new THREE.Mesh(new THREE.CylinderGeometry(s*0.85,s*0.85,s*2.6,12),dark);
-      en.rotation.x=Math.PI/2;en.position.set(sx*s*4.4,wy-s*1.05,-s*1.4);model.add(en);
+    if(AC.engines===1){ /* fighter: single tail nozzle */
+      const noz=new THREE.Mesh(new THREE.CylinderGeometry(s*0.75,s*0.6,s*3.2,14),dark);
+      noz.rotation.x=Math.PI/2;noz.position.set(0,0,s*8.5);model.add(noz);
+      if(AC.reheat)addBurner(0,0,s*11);
+    }else{
+      const xs=AC.engines===4?[-7.4,-3.9,3.9,7.4]:[-4.4,4.4];
+      for(const exx of xs){
+        const en=new THREE.Mesh(new THREE.CylinderGeometry(s*0.85,s*0.85,s*2.6,12),dark);
+        en.rotation.x=Math.PI/2;en.position.set(exx*s,wy-s*1.05,-s*1.4);model.add(en);
+        if(AC.reheat)addBurner(exx*s,wy-s*1.05,s*0.3);
+      }
     }
   }else{
     const positions=AC.engines===1?[[0,0,-s*11.6]]:[[-s*4.2,wy,-s*1.6],[s*4.2,wy,-s*1.6]];
@@ -723,27 +762,38 @@ function applyEnv(){
 }
 
 /* ---------------- WORLD BUILD (per flight) ---------------- */
-let destRwZ=0;
+let destRwZ=0,destX=0,destZ=0,rwyHdg=0;
+function pathPoint(f,lat){
+  const crs=(RT.crs||0);
+  const rx=Math.cos(crs*D2R), rz=Math.sin(crs*D2R);
+  return {x:f*destX+lat*rx, z:f*destZ+lat*rz};
+}
 function buildWorld(){
   worldD=18000+RT.nm*55;
-  destRwZ=-worldD;
-  makeRunway(-1500);
-  makeRunway(destRwZ);
+  const crs=RT.crs||0;
+  rwyHdg=(RT.rwyHdg!==undefined?RT.rwyHdg:crs);
+  destX=Math.sin(crs*D2R)*worldD;
+  destZ=-Math.cos(crs*D2R)*worldD;
+  destRwZ=destZ;
+  makeRunway(0,-1500,0);
+  makeRunway(destX,destZ,rwyHdg);
   makeCity(4200,-5200,360);
-  makeCity(-4600,destRwZ+5600,360);
+  const dc=pathPoint(0.9,-1400);
+  makeCity(dc.x,dc.z,360);
   makeMountains();
   makeClouds();
   makeSky();
   makeRain();
   if(RT.nm<200||RT.from==="SIN"||RT.from==="VLC"){
+    const wc=pathPoint(0.5,0);
     water=new THREE.Mesh(new THREE.PlaneGeometry(90000,worldD*0.34),
       new THREE.MeshLambertMaterial({color:0x1c4a66}));
-    water.rotation.x=-Math.PI/2;water.position.set(0,-0.1,-worldD*0.5);scene.add(water);
+    water.rotation.x=-Math.PI/2;water.position.set(wc.x,-0.1,wc.z);scene.add(water);
   }
   cruiseAltFt=Math.min(AC.ceiling*0.85,3000+RT.nm*38);
   S.ap.alt=Math.round(cruiseAltFt/500)*500;
   S.ap.spd=Math.round(AC.cruise/5)*5;
-  S.ap.hdg=360;
+  S.ap.hdg=Math.round(wrap360(crs))||360;
 }
 
 /* ---------------- PER-AIRCRAFT SYSTEMS ---------------- */
@@ -840,6 +890,73 @@ const SYSDEF={
     {tip:"ENG 2 — RUN (electric start)",voice:"Engine two, run",hi:"engMaster2",done:P.engRun(1)},
     {tip:"AVIONICS — ON",voice:"Avionics on",hi:"avionics",done:P.on("avionics")},
     {tip:"BEACON — ON",voice:"Beacon on",hi:"beacon",done:P.on("beacon")}
+  ]},
+  b744:{panels:[
+    {g:"ELECTRICAL",items:[{k:"bat1",l:"BAT 1"},{k:"bat2",l:"BAT 2"},{k:"extpwr",l:"EXT PWR"},{k:"avionics",l:"AVIONICS"}]},
+    {g:"APU",items:[{k:"apuMaster",l:"APU MASTER"},{k:"apuStart",l:"APU START"},{k:"apuBleed",l:"APU BLEED"}]},
+    {g:"FUEL PUMPS",items:[{k:"pumpL",l:"MAIN 1&2"},{k:"pumpR",l:"MAIN 3&4"}]},
+    {g:"ENGINE",items:[{k:"engMode",l:"ENG START",t:"rot",pos:["CRANK","NORM","IGN"],def:1},{k:"engMaster1",l:"ENG 1"},{k:"engMaster2",l:"ENG 2"},{k:"engMaster3",l:"ENG 3"},{k:"engMaster4",l:"ENG 4"}]},
+    {g:"HYDRAULICS",items:[{k:"hyd1",l:"HYD 1"},{k:"hyd2",l:"HYD 2"},{k:"hyd3",l:"HYD 3"},{k:"hyd4",l:"HYD 4"}]},
+    {g:"LIGHTS",items:[{k:"beacon",l:"BEACON"},{k:"nav",l:"NAV"},{k:"strobe",l:"STROBE"},{k:"landing",l:"LANDING"},{k:"taxi",l:"TAXI"}]},
+    {g:"ICE / SIGNS",items:[{k:"pitot",l:"PROBE HEAT"},{k:"antiice",l:"WING A/I"},{k:"belts",l:"SEATBELTS"},{k:"noSmk",l:"NO SMOKING"}]},
+    {g:"AUDIO",items:[{k:"sound",l:"SOUND"},{k:"callouts",l:"CALLOUTS"}]}
+  ],proc:[
+    {tip:"BAT 1 — ON",voice:"Battery one on",hi:"bat1",done:P.on("bat1")},
+    {tip:"BAT 2 — ON",voice:"Battery two on",hi:"bat2",done:P.on("bat2")},
+    {tip:"APU MASTER — ON",voice:"A P U master on",hi:"apuMaster",done:P.on("apuMaster")},
+    {tip:"APU START — ON, wait for AVAIL",voice:"A P U start",hi:"apuStart",done:()=>P.apuAvail()},
+    {tip:"APU BLEED — ON",voice:"A P U bleed on",hi:"apuBleed",done:P.on("apuBleed")},
+    {tip:"FUEL PUMPS 1&2 — ON",voice:"Fuel pumps forward on",hi:"pumpL",done:P.on("pumpL")},
+    {tip:"FUEL PUMPS 3&4 — ON",voice:"Fuel pumps aft on",hi:"pumpR",done:P.on("pumpR")},
+    {tip:"ENG START — IGN",voice:"Engine start, ignition",hi:"engMode",done:P.rotAt("engMode",2)},
+    {tip:"ENG 1 — ON",voice:"Start engine one",hi:"engMaster1",done:P.engRun(0)},
+    {tip:"ENG 2 — ON",voice:"Start engine two",hi:"engMaster2",done:P.engRun(1)},
+    {tip:"ENG 3 — ON",voice:"Start engine three",hi:"engMaster3",done:P.engRun(2)},
+    {tip:"ENG 4 — ON",voice:"Start engine four",hi:"engMaster4",done:P.engRun(3)},
+    {tip:"ENG START — NORM",voice:"Engine start norm",hi:"engMode",done:P.rotAt("engMode",1)},
+    {tip:"AVIONICS + BEACON — ON",voice:"Avionics and beacon on",hi:"avionics",done:P.on("avionics")}
+  ]},
+  conc:{panels:[
+    {g:"ELECTRICAL",items:[{k:"bat1",l:"BAT 1"},{k:"bat2",l:"BAT 2"},{k:"extpwr",l:"EXT PWR"},{k:"avionics",l:"AVIONICS"}]},
+    {g:"APU",items:[{k:"apuMaster",l:"APU MASTER"},{k:"apuStart",l:"APU START"},{k:"apuBleed",l:"APU BLEED"}]},
+    {g:"FUEL",items:[{k:"pumpL",l:"FWD PUMP"},{k:"pumpR",l:"AFT TRIM"}]},
+    {g:"ENGINE",items:[{k:"engMode",l:"IGNITION",t:"rot",pos:["OFF","NORM","FLIGHT"],def:1},{k:"engMaster1",l:"ENG 1"},{k:"engMaster2",l:"ENG 2"},{k:"engMaster3",l:"ENG 3"},{k:"engMaster4",l:"ENG 4"}]},
+    {g:"FLIGHT",items:[{k:"nose",l:"NOSE/VISOR",t:"rot",pos:["UP","5°","12.5°"],def:0},{k:"hydG",l:"HYD GRN"},{k:"hydB",l:"HYD BLU"}]},
+    {g:"LIGHTS",items:[{k:"beacon",l:"BEACON"},{k:"nav",l:"NAV"},{k:"strobe",l:"STROBE"},{k:"landing",l:"LANDING"},{k:"taxi",l:"TAXI"}]},
+    {g:"ICE / SIGNS",items:[{k:"pitot",l:"PITOT HEAT"},{k:"antiice",l:"ENG A/I"},{k:"belts",l:"SEATBELTS"},{k:"noSmk",l:"NO SMOKING"}]},
+    {g:"AUDIO",items:[{k:"sound",l:"SOUND"},{k:"callouts",l:"CALLOUTS"}]}
+  ],proc:[
+    {tip:"BAT 1 — ON",voice:"Battery one on",hi:"bat1",done:P.on("bat1")},
+    {tip:"BAT 2 — ON",voice:"Battery two on",hi:"bat2",done:P.on("bat2")},
+    {tip:"APU MASTER — ON",voice:"A P U master on",hi:"apuMaster",done:P.on("apuMaster")},
+    {tip:"APU START — ON, wait for AVAIL",voice:"A P U start",hi:"apuStart",done:()=>P.apuAvail()},
+    {tip:"APU BLEED — ON",voice:"A P U bleed on",hi:"apuBleed",done:P.on("apuBleed")},
+    {tip:"FWD FUEL PUMP — ON",voice:"Forward fuel pump on",hi:"pumpL",done:P.on("pumpL")},
+    {tip:"IGNITION — FLIGHT",voice:"Ignition, flight",hi:"engMode",done:P.rotAt("engMode",2)},
+    {tip:"ENG 1 — ON",voice:"Start engine one",hi:"engMaster1",done:P.engRun(0)},
+    {tip:"ENG 2 — ON",voice:"Start engine two",hi:"engMaster2",done:P.engRun(1)},
+    {tip:"ENG 3 — ON",voice:"Start engine three",hi:"engMaster3",done:P.engRun(2)},
+    {tip:"ENG 4 — ON",voice:"Start engine four",hi:"engMaster4",done:P.engRun(3)},
+    {tip:"IGNITION — NORM",voice:"Ignition, norm",hi:"engMode",done:P.rotAt("engMode",1)},
+    {tip:"NOSE — DROOP 5° for taxi",voice:"Droop nose, five degrees",hi:"nose",done:P.rotMin("nose",1)},
+    {tip:"AVIONICS + BEACON — ON",voice:"Avionics and beacon on",hi:"avionics",done:P.on("avionics")}
+  ]},
+  f16:{panels:[
+    {g:"ELECTRICAL",items:[{k:"bat1",l:"MAIN PWR"},{k:"avionics",l:"AVIONICS/MFD"}]},
+    {g:"ENGINE START",items:[{k:"jfs",l:"JFS"},{k:"fuelPump",l:"FUEL MASTER"},{k:"engMaster1",l:"THROTTLE IDLE→RUN"}]},
+    {g:"CANOPY",items:[{k:"canopy",l:"CANOPY"}]},
+    {g:"LIGHTS",items:[{k:"beacon",l:"ANTI-COLL"},{k:"nav",l:"NAV"},{k:"strobe",l:"STROBE"},{k:"landing",l:"LANDING"},{k:"taxi",l:"TAXI"}]},
+    {g:"ICE / MISC",items:[{k:"pitot",l:"PITOT HEAT"},{k:"belts",l:"HARNESS"}]},
+    {g:"AUDIO",items:[{k:"sound",l:"SOUND"},{k:"callouts",l:"CALLOUTS"}]}
+  ],proc:[
+    {tip:"MAIN POWER — ON",voice:"Main power on",hi:"bat1",done:P.on("bat1")},
+    {tip:"FUEL MASTER — ON",voice:"Fuel master on",hi:"fuelPump",done:P.on("fuelPump")},
+    {tip:"JFS — START (jet fuel starter)",voice:"J F S, start",hi:"jfs",done:P.on("jfs")},
+    {tip:"THROTTLE — IDLE (crack ~10%)",voice:"Throttle to idle",hi:null,done:P.thr(0.05,0.35)},
+    {tip:"THROTTLE RUN — engine start",voice:"Engine, run",hi:"engMaster1",done:P.engRun(0)},
+    {tip:"AVIONICS/MFD — ON",voice:"Avionics on",hi:"avionics",done:P.on("avionics")},
+    {tip:"CANOPY — CLOSE",voice:"Canopy closed",hi:"canopy",done:P.on("canopy")},
+    {tip:"ANTI-COLLISION — ON",voice:"Anti collision on",hi:"beacon",done:P.on("beacon")}
   ]}
 };
 const GUIDE={steps:[],idx:0,active:false};
@@ -936,7 +1053,11 @@ function updateSystems(dt){
       keep=((SYS.mag|0)>=1)&&fuelOk;
     }else{
       const fuelOk=S.fuel>0&&fuelPressure();
-      const arm=(AC.type==="jet")?(engModeStart()&&(AC.estart||PWR.bleed)):true;
+      let arm;
+      if(AC.type!=="jet")arm=true;
+      else if(AC.estart)arm=true;              /* 787 electric start */
+      else if(AC.jfs)arm=!!SYS.jfs;            /* F-16 jet fuel starter */
+      else arm=engModeStart()&&PWR.bleed;      /* conventional: ignition + bleed */
       crank=engMasterOn(i)&&PWR.elec&&fuelOk&&arm;
       keep=engMasterOn(i)&&fuelOk;
     }
@@ -963,13 +1084,16 @@ function resetSystems(){
 }
 function setWarmSystems(){
   const on=k=>{if(k in SYS)SYS[k]=1;};
-  ["bat","bat1","bat2","avionics","pumpL","pumpR","fuelPump","fuelPumpL","fuelPumpR","ignition",
-   "beacon","nav","strobe","belts","pitot","gen1","gen2","hydG","hydB","hydY","pack1","pack2","adirs","noSmk","alt"].forEach(on);
+  ["bat","bat1","bat2","avionics","pumpL","pumpR","fuelPump","fuelPumpL","fuelPumpR","ignition","canopy",
+   "beacon","nav","strobe","belts","pitot","gen1","gen2","hydG","hydB","hydY","hyd1","hyd2","hyd3","hyd4","pack1","pack2","adirs","noSmk","alt"].forEach(on);
   SYS.landing=(ENV.time!=="day")?1:0;
   if(AC===AIRCRAFT.c172){SYS.fuelSel=2;SYS.mixture=1;SYS.mag=3;}
   if(AC===AIRCRAFT.q400){SYS.condL=2;SYS.condR=2;SYS.engStart1=1;SYS.engStart2=1;}
   if(AC===AIRCRAFT.a320){SYS.engMode=1;SYS.engMaster1=1;SYS.engMaster2=1;}
   if(AC===AIRCRAFT.b787){SYS.engMode=0;SYS.engMaster1=1;SYS.engMaster2=1;SYS.gen1=1;SYS.gen2=1;}
+  if(AC===AIRCRAFT.b744){SYS.engMode=1;SYS.engMaster1=SYS.engMaster2=SYS.engMaster3=SYS.engMaster4=1;}
+  if(AC===AIRCRAFT.conc){SYS.engMode=1;SYS.engMaster1=SYS.engMaster2=SYS.engMaster3=SYS.engMaster4=1;SYS.nose=1;}
+  if(AC===AIRCRAFT.f16){SYS.engMaster1=1;SYS.canopy=1;}
   for(const e of S.eng){e.running=true;e.n2=1;e.lit=true;e.egt=0.4;}
   updateSystems(0);
 }
@@ -1127,6 +1251,12 @@ function drawInstruments(){
       ig.fillStyle="#5fd4d0";ig.beginPath();ig.moveTo(-5,-r+4);ig.lineTo(5,-r+4);ig.lineTo(0,-r+12);ig.fill();
       ig.restore();
     }
+    /* bearing-to-destination pointer (magenta) */
+    ig.save();ig.translate(hx,cy);ig.rotate((bearingToDest()-S.hdg)*D2R);
+    ig.strokeStyle="#c86fff";ig.fillStyle="#c86fff";ig.lineWidth=2;
+    ig.beginPath();ig.moveTo(0,-r+6);ig.lineTo(0,-r+22);ig.stroke();
+    ig.beginPath();ig.moveTo(0,-r+3);ig.lineTo(-4,-r+10);ig.lineTo(4,-r+10);ig.fill();
+    ig.restore();
   }
   /* --- engine block --- */
   const ex=706;
@@ -1135,24 +1265,25 @@ function drawInstruments(){
   ig.fillStyle="#5a6478";ig.font="9px Consolas";ig.textAlign="left";
   ig.fillText(AC.type==="jet"?"N1 % / N2":"NP % / ITT",ex+10,32);
   const nEng=AC.engines;
+  const bw=nEng>2?24:40, sp=nEng>2?31:58;
   for(let i=0;i<nEng;i++){
     const e=S.eng[i]||{running:false,n2:0,lit:false,egt:0};
     const starting=!e.running&&e.n2>0.01;
     const val=powered?(e.running?S.n1:e.n2):0;
-    const bx=ex+10+i*58;
-    ig.fillStyle="#161c28";ig.fillRect(bx,38,40,58);
+    const bx=ex+10+i*sp;
+    ig.fillStyle="#161c28";ig.fillRect(bx,38,bw,58);
     ig.fillStyle=e.running?(val>0.95?"#ff8080":"#59d98c"):(starting?"#e0a53a":"#2a3348");
-    ig.fillRect(bx,38+58*(1-val),40,58*val);
-    ig.strokeStyle="#2c3548";ig.strokeRect(bx,38,40,58);
+    ig.fillRect(bx,38+58*(1-val),bw,58*val);
+    ig.strokeStyle="#2c3548";ig.strokeRect(bx,38,bw,58);
     /* EGT/ITT tick */
-    if(powered&&e.lit){ig.fillStyle="#ff7a4a";ig.fillRect(bx+42,38+58*(1-e.egt),4,58*e.egt);}
-    ig.fillStyle="#dfe6f0";ig.font="700 12px Consolas";ig.textAlign="center";
-    ig.fillText(powered?Math.round(val*100):"--",bx+20,112);
+    if(powered&&e.lit){ig.fillStyle="#ff7a4a";ig.fillRect(bx+bw+1,38+58*(1-e.egt),3,58*e.egt);}
+    ig.fillStyle="#dfe6f0";ig.font="700 "+(nEng>2?11:12)+"px Consolas";ig.textAlign="center";
+    ig.fillText(powered?Math.round(val*100):"--",bx+bw/2,112);
     ig.fillStyle=starting?"#e0a53a":"#5a6478";ig.font="8px Consolas";
-    ig.fillText(starting?"START":("ENG "+(i+1)),bx+20,124);
+    ig.fillText(starting?"ST":(nEng>2?String(i+1):("ENG "+(i+1))),bx+bw/2,124);
   }
   /* fuel bar */
-  const fbx=ex+10+nEng*58+8;
+  const fbx=ex+10+nEng*sp+6;
   ig.fillStyle="#5a6478";ig.font="9px Consolas";ig.textAlign="left";ig.fillText("FUEL",fbx,32);
   ig.fillStyle="#161c28";ig.fillRect(fbx,38,18,58);
   ig.fillStyle=S.fuel<20?"#ff8080":"#5fd4d0";
@@ -1168,6 +1299,8 @@ function drawInstruments(){
   if(AC.apu){ig.fillStyle=S.apu.state==="avail"?"#59d98c":(S.apu.state==="start"?"#e0a53a":"#5a6478");
     ig.fillText("APU "+(S.apu.state==="avail"?"AVAIL":S.apu.state==="start"?Math.round(S.apu.spool*100)+"%":"OFF"),rx,100);}
   else if(AC.type==="jet"){ig.fillStyle=PWR.bleed?"#59d98c":"#5a6478";ig.fillText("BLEED "+(PWR.bleed?"ON":"OFF"),rx,100);}
+  ig.fillStyle=S.spoiler?"#e0a53a":"#5a6478";ig.fillText("SPLR "+(S.spoiler?"OUT":"IN"),rx,114);
+  ig.fillStyle=Math.abs(S.trim)>0.01?"#9aa6bd":"#5a6478";ig.fillText("TRIM "+(S.trim>0?"+":"")+S.trim.toFixed(1),rx,128);
   if(!powered){
     ig.fillStyle="#3a4356";ig.font="10px Consolas";ig.textAlign="center";
     ig.fillText("PANEL UNPOWERED — POWER + AVIONICS",470,160);
@@ -1180,22 +1313,40 @@ function drawMap(){
   mg.clearRect(0,0,340,96);
   mg.fillStyle="#0a0e15";mg.fillRect(0,0,340,96);
   mg.strokeStyle="#2a3448";mg.strokeRect(0,0,340,96);
-  const x0=36,x1=304,y=48;
-  mg.strokeStyle="#39496e";mg.lineWidth=2;mg.setLineDash([5,4]);
-  mg.beginPath();mg.moveTo(x0,y);mg.lineTo(x1,y);mg.stroke();mg.setLineDash([]);
-  mg.fillStyle="#5fd4d0";mg.font="700 11px Consolas";mg.textAlign="center";
-  mg.fillText(RT.from,x0,y-14);mg.fillText(RT.to,x1,y-14);
-  mg.fillStyle="#39496e";mg.beginPath();mg.arc(x0,y,4,0,7);mg.fill();mg.beginPath();mg.arc(x1,y,4,0,7);mg.fill();
-  const frac=clamp(1-remainingM()/worldD,0,1);
-  const px=x0+(x1-x0)*frac;
-  mg.save();mg.translate(px,y);mg.rotate(Math.PI/2);
-  mg.fillStyle="#ffd34d";mg.font="14px sans-serif";mg.textAlign="center";
-  mg.fillText("✈",0,5);mg.restore();
-  mg.fillStyle="#8a94a8";mg.font="10px Consolas";mg.textAlign="center";
-  mg.fillText(Math.round(remainingNm())+" nm to go · FL"+String(Math.round(S.alt/FT2M/100)).padStart(3,"0"),170,86);
+  /* top-down plan: fit departure(0,-1500), destination, aircraft */
+  const depZ=-1500;
+  const xs=[0,destX,S.x], zs=[depZ,destZ,S.z];
+  let minX=Math.min(...xs),maxX=Math.max(...xs),minZ=Math.min(...zs),maxZ=Math.max(...zs);
+  const padW=(maxX-minX)*0.12+800, padH=(maxZ-minZ)*0.12+800;
+  minX-=padW;maxX+=padW;minZ-=padH;maxZ+=padH;
+  const sc=Math.min((340-40)/(maxX-minX||1),(76-16)/(maxZ-minZ||1));
+  const cx=(340-(maxX-minX)*sc)/2, cy=(96-14-(maxZ-minZ)*sc)/2;
+  const MX=wx=>cx+(wx-minX)*sc, MZ=wz=>cy+(wz-minZ)*sc; /* north(-z) toward top */
+  const dep=[MX(0),MZ(depZ)], dst=[MX(destX),MZ(destZ)], ac=[MX(S.x),MZ(S.z)];
+  /* route line */
+  mg.strokeStyle="#39496e";mg.lineWidth=1.6;mg.setLineDash([5,4]);
+  mg.beginPath();mg.moveTo(dep[0],dep[1]);mg.lineTo(dst[0],dst[1]);mg.stroke();mg.setLineDash([]);
+  /* departure */
+  mg.fillStyle="#59d98c";mg.beginPath();mg.arc(dep[0],dep[1],3.5,0,7);mg.fill();
+  mg.font="700 9px Consolas";mg.textAlign="center";mg.fillText(RT.from,dep[0],dep[1]+13);
+  /* destination + runway tick */
+  mg.fillStyle="#5fd4d0";mg.beginPath();mg.arc(dst[0],dst[1],3.5,0,7);mg.fill();
+  mg.fillText(RT.to,dst[0],dst[1]-8);
+  mg.save();mg.translate(dst[0],dst[1]);mg.rotate(rwyHdg*D2R);
+  mg.strokeStyle="#5fd4d0";mg.lineWidth=2;mg.beginPath();mg.moveTo(0,-7);mg.lineTo(0,7);mg.stroke();mg.restore();
+  /* aircraft triangle rotated to heading */
+  mg.save();mg.translate(ac[0],ac[1]);mg.rotate(S.hdg*D2R);
+  mg.fillStyle="#ffd34d";mg.beginPath();mg.moveTo(0,-6);mg.lineTo(4,5);mg.lineTo(-4,5);mg.closePath();mg.fill();mg.restore();
+  /* bearing-to-destination line from aircraft */
+  mg.strokeStyle="#c86fff";mg.lineWidth=1;mg.setLineDash([2,3]);
+  mg.beginPath();mg.moveTo(ac[0],ac[1]);mg.lineTo(dst[0],dst[1]);mg.stroke();mg.setLineDash([]);
+  mg.fillStyle="#8a94a8";mg.font="9px Consolas";mg.textAlign="left";
+  mg.fillText(Math.round(remainingNm())+" nm · BRG "+pad3(bearingToDest())+"°",6,90);
+  mg.textAlign="right";mg.fillText("FL"+String(Math.round(S.alt/FT2M/100)).padStart(3,"0"),334,90);
 }
-function remainingM(){return clamp(worldD+S.z,0,worldD);}
-function remainingNm(){return remainingM()/worldD*RT.nm;}
+function remainingM(){return Math.hypot(destX-S.x,destZ-S.z);}
+function remainingNm(){return clamp(remainingM()/worldD,0,1)*RT.nm;}
+function bearingToDest(){return wrap360(Math.atan2(destX-S.x,-(destZ-S.z))*R2D);}
 
 /* ---------------- FX CANVAS (windshield rain, lightning) ---------------- */
 const fx=document.getElementById("fx"),fg=fx.getContext("2d");
@@ -1236,8 +1387,9 @@ function physics(dt){
   /* config */
   const vsEff=AC.vs0-(AC.vs0-AC.vsF)*(S.flaps/3);
   const engFrac=running/AC.engines;
-  const thrust=AC.accel*Math.max(0,(S.n1-0.18)/0.82)*engFrac;
-  const drag=AC.accel*Math.pow(S.spd/AC.vmax,2)*(1+S.flaps*0.28+(S.gear&&S.spd>vsEff?0.42:0));
+  let thrust=AC.accel*Math.max(0,(S.n1-0.18)/0.82)*engFrac;
+  if(AC.reheat&&S.throttle>0.9&&running>0)thrust*=1.55; /* afterburner / reheat */
+  const drag=AC.accel*Math.pow(S.spd/AC.vmax,2)*(1+S.flaps*0.28+(S.gear&&S.spd>vsEff?0.42:0)+(S.spoiler?0.6:0));
   /* aoa & flight path */
   const alphaReq=clamp(1.5+9*Math.pow(vsEff/Math.max(S.spd,25),2)-S.flaps*0.7,0,14);
   let gamma=S.pitch-alphaReq;
@@ -1246,8 +1398,9 @@ function physics(dt){
   /* speed */
   let dV=thrust-drag-19.06*Math.sin(gamma*D2R)*0.72;
   if(S.onGround){
-    dV-=0.7+(S.brakes?3.6:0)+(S.pitch>1?0.4:0);
-    if(S.spd<0.5&&thrust<0.3)dV=Math.max(dV,-S.spd/dt||0);
+    const braking=(S.brakes?3.6:0)+(S.parkBrake?6:0)+((S.autobrake&&S.phase==="LANDED")?3.0:0)+(S.spoiler?0.8:0);
+    dV-=0.7+braking+(S.pitch>1?0.4:0);
+    if((S.spd<0.5&&thrust<0.3)||(S.parkBrake&&S.spd<1))dV=Math.max(dV,-S.spd/dt||0);
   }
   S.spd=Math.max(0,S.spd+dV*dt);
   /* vertical */
@@ -1262,7 +1415,7 @@ function physics(dt){
   }
   if(S.onGround){
     const canFly=S.spd>AC.vr*0.96&&S.pitch>2;
-    if(canFly&&vs>0){S.onGround=false;}
+    if(canFly&&vs>0){S.onGround=false;S.spoiler=false;}
     else{vs=0;S.alt=0;if(S.pitch<0)S.pitch=0;}
   }
   S.vspd=vs;S.gamma=gamma;
@@ -1277,7 +1430,7 @@ function physics(dt){
     if(!S.gear){endFlight(false,"GEAR-UP LANDING","You forgot the wheels. The fire crew forgives you; the airline does not.");return;}
     if(fpm>950){endFlight(false,"HARD IMPACT","Touchdown at "+Math.round(fpm)+" fpm. Structural limits exceeded.");return;}
     if(!onRwy&&S.spd>90){endFlight(false,"OFF-FIELD CRASH","High-speed touchdown off the runway.");return;}
-    S.onGround=true;
+    S.onGround=true;S.spoiler=true;
     if(S.phase!=="LANDED"){
       setPhase("LANDED");
       const msg=fpm<120?"Did we even land? Silk. Absolute silk.":fpm<300?"Lovely touchdown — passengers are clapping.":fpm<600?"Firm. Navy style. She'll take it.":"Ouch. Logging that one as 'arrival', not 'landing'.";
@@ -1317,10 +1470,15 @@ function physics(dt){
   /* fuel starvation */
   if(S.fuel<=0&&running>0){copilot("Fuel exhausted. It's a glider now.");}
 }
+function overRunway(cx,cz,hdg,halfLen){
+  const dx=S.x-cx, dz=S.z-cz;
+  const s=Math.sin(hdg*D2R), c=Math.cos(hdg*D2R);
+  const lon=dx*s + dz*(-c);   /* along runway (heading dir) */
+  const lat=dx*c + dz*s;      /* across runway */
+  return Math.abs(lat)<44 && Math.abs(lon)<halfLen;
+}
 function isOverRunway(){
-  if(Math.abs(S.x)<42&&S.z<50&&S.z>-3100)return true;
-  if(Math.abs(S.x)<42&&Math.abs(S.z-destRwZ)<1600)return true;
-  return false;
+  return overRunway(0,-1500,0,1650) || overRunway(destX,destZ,rwyHdg,1650);
 }
 
 /* ---------------- AUTOPILOT ---------------- */
@@ -1356,6 +1514,9 @@ function phaseLogic(){
     if(altFt>800)setPhase("CLIMB");
   }
   if(S.phase==="CLIMB"){
+    if(!F.turnCue&&altFt>350){F.turnCue=1;const b=bearingToDest();const d=wrap180(b-S.hdg);
+      copilot("Bank "+(d>=0?"right":"left")+" to heading "+pad3(b)+" — "+RT.tc+" is off to the "+(d>=0?"right":"left")+". Follow the magenta pointer.");
+      say("Turn "+(d>=0?"right":"left")+" heading "+pad3(b));}
     if(S.gear&&altFt>1500&&!F.gearNag){F.gearNag=1;copilot("Gear's still hanging out — that's a lot of drag.");}
     if(altFt>cruiseAltFt*0.9){setPhase("CRUISE");
       copilot("Levelling at "+Math.round(cruiseAltFt/100)/10+" thousand. "+RT.tc+" is "+Math.round(remNm)+" miles ahead. Autopilot is armed if you want it.");}
@@ -1367,7 +1528,7 @@ function phaseLogic(){
       say("Begin descent.");}
   }
   if((S.phase==="DESCENT"||S.phase==="CRUISE")&&remNm<11&&altFt<4500)
-    {setPhase("APPROACH");copilot("Approach: flaps on schedule (F), gear before 1500 (G), bug "+Math.round(AC.vsF*1.3)+" knots.");}
+    {setPhase("APPROACH");copilot("Approach into "+RT.tc+" — runway heading "+pad3(rwyHdg)+", turn to line up with it. Flaps on schedule (F), gear before 1500 (G), bug "+Math.round(AC.vsF*1.3)+" kt.");}
   if(S.phase==="APPROACH"){
     for(const h of [500,100,50,40,30,20,10]){
       if(altFt<=h&&!F["ra"+h]&&!S.onGround){F["ra"+h]=1;
@@ -1435,8 +1596,9 @@ function updateCamera(dt){
     camera.lookAt(acGroup.position);
     camera.fov=60;
   }else if(S.view===3){ /* tower */
-    const nearDest=Math.abs(S.z-destRwZ)<Math.abs(S.z);
-    camera.position.set(320,42,nearDest?destRwZ+400:-900);
+    const dDep=Math.hypot(S.x,S.z+1500), dDst=Math.hypot(S.x-destX,S.z-destZ);
+    if(dDst<dDep)camera.position.set(destX+320,42,destZ+400);
+    else camera.position.set(320,42,-900);
     camera.lookAt(acGroup.position);
     camera.fov=clamp(9000/Math.max(60,camera.position.distanceTo(acGroup.position)),4,55);
   }else{ /* wing */
@@ -1464,6 +1626,8 @@ function lampsTick(dt){
   landSpot.intensity=(PWR.elec&&SYS.landing)?(ENV.time==="night"?3.2:1.1):0;
   gearGrp.visible=S.gear;
   for(const d of propDiscs){d.rotation.z+=S.n1*40*dt;d.material.opacity=0.05+S.n1*0.16;}
+  const ab=(AC.reheat&&S.throttle>0.86&&enginesRunning()>0)?(0.55+Math.random()*0.45):0;
+  for(const b of burners)b.material.opacity=ab;
 }
 
 /* ---------------- ANNUNCIATORS / READOUTS ---------------- */
@@ -1477,11 +1641,14 @@ function uiTick(){
   ann("anFlaps",S.flaps>0?"g":"");
   ann("anAp",S.ap.on?"g":"");
   ann("anBrk",S.brakes?"a":"");
+  ann("anSpd",S.spoiler?"a":"");
+  ann("anPark",S.parkBrake?"r":"");
   ann("anFuel",S.fuel<20?(S.fuel<8?"r":"a"):"");
   ann("anPitot",S.pitotIce?"a":"");
   document.getElementById("tbIas").textContent=Math.round(S.spd);
   document.getElementById("tbAlt").textContent=Math.round(S.alt/FT2M).toLocaleString();
   document.getElementById("tbHdg").textContent=pad3(S.hdg);
+  document.getElementById("tbBrg").textContent=pad3(bearingToDest());
   document.getElementById("tbDist").textContent=remainingNm().toFixed(remainingNm()<10?1:0);
   const gs=S.spd*KT2MS;
   const ete=gs>20?remainingM()/gs:0;
@@ -1492,6 +1659,9 @@ function uiTick(){
   const gl=document.getElementById("gearLever");
   gl.textContent=S.gear?"GEAR ▼":"GEAR ▲";
   gl.className="cbtn "+(S.gear?"act":"");
+  document.getElementById("spdBrkBtn").classList.toggle("act",S.spoiler);
+  document.getElementById("parkBtn").classList.toggle("hot",S.parkBrake);
+  document.getElementById("abrkBtn").classList.toggle("act",S.autobrake);
   document.getElementById("apAlt").textContent=S.ap.alt;
   document.getElementById("apHdg").textContent=pad3(S.ap.hdg);
   document.getElementById("apSpd").textContent=S.ap.spd;
@@ -1515,6 +1685,10 @@ addEventListener("keydown",e=>{
   if(k==="p"||k==="P")togglePause();
   if(k==="h"||k==="H"){const h=document.getElementById("help");h.style.display=h.style.display==="flex"?"none":"flex";}
   if(k==="t"||k==="T")cycleAccel();
+  if(k==="x"||k==="X"){S.spoiler=!S.spoiler;clickSnd();copilot(S.spoiler?"Speedbrake extended.":"Speedbrake retracted.");}
+  if(k===","){S.parkBrake=!S.parkBrake;clickSnd();copilot(S.parkBrake?"Parking brake set.":"Parking brake released.");}
+  if(k==="[")S.trim=clamp(S.trim-0.5,-6,6);
+  if(k==="]")S.trim=clamp(S.trim+0.5,-6,6);
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(k))e.preventDefault();
 });
 addEventListener("keyup",e=>{KEYS[e.key]=false;if(e.key==="b"||e.key==="B")S.brakes=false;});
@@ -1542,11 +1716,14 @@ function controlsTick(dt){
   if(S.ap.on)
     {if(KEYS.ArrowUp||KEYS.ArrowDown||KEYS.ArrowLeft||KEYS.ArrowRight){S.ap.on=false;copilot("Autopilot disconnected — your aircraft.");say("Autopilot.");}}
   if(!S.ap.on){
-    if(KEYS.ArrowDown)S.pitch+=14*dt;
-    if(KEYS.ArrowUp)S.pitch-=14*dt;
-    if(KEYS.ArrowLeft)S.roll-=42*dt;
-    if(KEYS.ArrowRight)S.roll+=42*dt;
+    const rr=42*(AC.roll||1), pr=14*(AC.roll?0.6+0.4*AC.roll:1);
+    if(KEYS.ArrowDown)S.pitch+=pr*dt;
+    if(KEYS.ArrowUp)S.pitch-=pr*dt;
+    if(KEYS.ArrowLeft)S.roll-=rr*dt;
+    if(KEYS.ArrowRight)S.roll+=rr*dt;
   }
+  /* pitch trim eases hands-off pitch toward the trim setting */
+  if(!S.ap.on&&!S.onGround&&!KEYS.ArrowUp&&!KEYS.ArrowDown)S.pitch+=(S.trim-S.pitch)*0.4*dt;
   S.rudder=0;
   if(KEYS.a||KEYS.A)S.rudder=-1;
   if(KEYS.d||KEYS.D)S.rudder=1;
@@ -1562,6 +1739,11 @@ document.getElementById("flapDn").onclick=()=>setFlaps(S.flaps+1);
 document.getElementById("flapUp").onclick=()=>setFlaps(S.flaps-1);
 const brakeBtn=document.getElementById("brakeBtn");
 brakeBtn.onmousedown=()=>S.brakes=true;brakeBtn.onmouseup=brakeBtn.onmouseleave=()=>S.brakes=false;
+document.getElementById("spdBrkBtn").onclick=()=>{S.spoiler=!S.spoiler;clickSnd();copilot(S.spoiler?"Speedbrake extended.":"Speedbrake retracted.");};
+document.getElementById("parkBtn").onclick=()=>{S.parkBrake=!S.parkBrake;clickSnd();copilot(S.parkBrake?"Parking brake set.":"Parking brake released.");};
+document.getElementById("abrkBtn").onclick=()=>{S.autobrake=!S.autobrake;clickSnd();copilot(S.autobrake?"Autobrake armed for landing.":"Autobrake off.");};
+document.getElementById("trimDn").onclick=()=>{S.trim=clamp(S.trim-0.5,-6,6);clickSnd();};
+document.getElementById("trimUp").onclick=()=>{S.trim=clamp(S.trim+0.5,-6,6);clickSnd();};
 document.getElementById("apMaster").onclick=()=>{
   S.ap.on=!S.ap.on;clickSnd();
   if(S.ap.on){S.ap.hdg=Math.round(S.hdg/5)*5||360;copilot("Autopilot engaged — holding "+S.ap.alt+" feet, heading "+pad3(S.ap.hdg)+".");}
@@ -1639,6 +1821,7 @@ function startFlight(coldDark){
   S.onGround=true;S.gear=true;S.flaps=0;S.throttle=0;S.fuel=100;S.elapsed=0;
   S.crashed=false;S.tdRate=0;S.stalled=false;S.ovspd=false;S.pitotIce=false;
   S.paused=false;S.tAccel=1;S.flavorT=undefined;S.flags={};
+  S.spoiler=false;S.parkBrake=false;S.autobrake=false;S.trim=0;
   document.getElementById("debrief").style.display="none";
   resetSystems();
   buildSwitches();
