@@ -565,28 +565,72 @@ function makeRunway(xc,zc,hdgDeg){
   return grp;
 }
 
-/* city builder */
+/* city builder — textured buildings, lit windows at night, street grid */
 const cityMats=[],cityLightPts=[];
-function makeCity(cx,cz,n){
-  const geo=new THREE.BoxGeometry(1,1,1);
-  const mat=new THREE.MeshLambertMaterial({color:0x8a919c});
-  cityMats.push(mat);
-  const inst=new THREE.InstancedMesh(geo,mat,n);
-  const m=new THREE.Matrix4();
-  const lp=[];
-  for(let i=0;i<n;i++){
-    const a=Math.random()*Math.PI*2, r=300+Math.random()*3800;
-    const x=cx+Math.cos(a)*r, z=cz+Math.sin(a)*r*0.7;
-    const w=25+Math.random()*45, h=18+Math.pow(Math.random(),2.6)*260, d=25+Math.random()*45;
-    m.makeScale(w,h,d);m.setPosition(x,h/2,z);
-    inst.setMatrixAt(i,m);
-    for(let k=0;k<3;k++)lp.push(x+(Math.random()-0.5)*60, 4+Math.random()*h, z+(Math.random()-0.5)*60);
+function buildingMats(base,cols,rows,roofCol){
+  const day=document.createElement("canvas");day.width=128;day.height=256;
+  const dg=day.getContext("2d");
+  dg.fillStyle=base;dg.fillRect(0,0,128,256);
+  const lit=document.createElement("canvas");lit.width=128;lit.height=256;
+  const lg=lit.getContext("2d");lg.fillStyle="#000";lg.fillRect(0,0,128,256);
+  const cw=128/cols,ch=256/rows;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const x=c*cw+cw*0.18,y=r*ch+ch*0.22,w=cw*0.62,h=ch*0.52;
+    dg.fillStyle=Math.random()<0.5?"#28323e":"#1e2833";dg.fillRect(x,y,w,h);
+    if(Math.random()<0.55){
+      lg.fillStyle=["#ffc878","#ffe2b0","#cde3ff"][(Math.random()*3)|0];
+      lg.fillRect(x,y,w,h);
+    }
   }
-  inst.instanceMatrix.needsUpdate=true;scene.add(inst);
-  const lg=new THREE.BufferGeometry();
-  lg.setAttribute("position",new THREE.Float32BufferAttribute(lp,3));
-  const pts=new THREE.Points(lg,new THREE.PointsMaterial({color:0xffc873,size:5,sizeAttenuation:true,transparent:true,opacity:0.9}));
+  const side=new THREE.MeshLambertMaterial({map:new THREE.CanvasTexture(day),
+    emissiveMap:new THREE.CanvasTexture(lit),emissive:new THREE.Color(0x000000)});
+  cityMats.push(side);
+  const roof=new THREE.MeshLambertMaterial({color:roofCol});
+  return [side,side,roof,roof,side,side];
+}
+function makeCity(cx,cz){
+  const grid=95;
+  const defs=[
+    {n:46, r0:0,   r1:1000,w0:26,w1:44,h0:110,h1:300,mats:buildingMats("#6f8296",8,26,0x3a4048)}, /* glass towers */
+    {n:170,r0:500, r1:2600,w0:36,w1:64,h0:28, h1:95, mats:buildingMats("#9a9080",7,12,0x6a625a)}, /* mid-rise blocks */
+    {n:220,r0:1700,r1:4200,w0:16,w1:26,h0:7,  h1:15, mats:buildingMats("#8a8072",4,3,0x7a5a48)}   /* low houses */
+  ];
+  const m4=new THREE.Matrix4();
+  for(const df of defs){
+    const inst=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),df.mats,df.n);
+    for(let i=0;i<df.n;i++){
+      const a=Math.random()*Math.PI*2, r=df.r0+Math.random()*(df.r1-df.r0);
+      const x=Math.round((cx+Math.cos(a)*r)/grid)*grid+(Math.random()-0.5)*20;
+      const z=Math.round((cz+Math.sin(a)*r)/grid)*grid+(Math.random()-0.5)*20;
+      const w=lerp(df.w0,df.w1,Math.random()),d=lerp(df.w0,df.w1,Math.random());
+      const h=lerp(df.h0,df.h1,Math.pow(Math.random(),1.6));
+      m4.makeScale(w,h,d);m4.setPosition(x,h/2,z);
+      inst.setMatrixAt(i,m4);
+    }
+    inst.instanceMatrix.needsUpdate=true;scene.add(inst);
+  }
+  /* streetlights along the grid */
+  const lp=[];
+  for(let gx=-4200;gx<=4200;gx+=grid)for(let gz=-4200;gz<=4200;gz+=grid){
+    if(Math.hypot(gx,gz)>4200||Math.random()<0.55)continue;
+    lp.push(cx+gx+grid/2,5,cz+gz,cx+gx,5,cz+gz+grid/2);
+  }
+  const lgeo=new THREE.BufferGeometry();
+  lgeo.setAttribute("position",new THREE.Float32BufferAttribute(lp,3));
+  const pts=new THREE.Points(lgeo,new THREE.PointsMaterial({color:0xffc873,size:5,sizeAttenuation:true,transparent:true,opacity:0.9}));
   pts.visible=false;scene.add(pts);cityLightPts.push(pts);
+  /* road-grid decal */
+  const rc=document.createElement("canvas");rc.width=rc.height=512;
+  const rg=rc.getContext("2d");
+  const step=512*grid/8600;
+  rg.strokeStyle="rgba(40,43,48,0.85)";rg.lineWidth=Math.max(2,step*0.18);
+  for(let p=0;p<=512;p+=step){
+    rg.beginPath();rg.moveTo(p,0);rg.lineTo(p,512);rg.stroke();
+    rg.beginPath();rg.moveTo(0,p);rg.lineTo(512,p);rg.stroke();
+  }
+  const road=new THREE.Mesh(new THREE.PlaneGeometry(8600,8600),
+    new THREE.MeshLambertMaterial({map:new THREE.CanvasTexture(rc),transparent:true}));
+  road.rotation.x=-Math.PI/2;road.position.set(cx,0.12,cz);scene.add(road);
 }
 
 /* mountains */
@@ -682,20 +726,53 @@ function lampSprite(color,s){
 /* per-aircraft exterior geometry (units are multiples of AC.size) */
 const GEO={
   c172:{fusL:15,fusR:0.85,noseZ:1.3,span:21,chord:3.0,sweep:0,dih:0.03,wingY:1.1,wingZ:-1.0,
-    tail:"conv",finH:3.4,finCh:2.2,hstSpan:7.4,strut:1,pants:1},
+    tail:"conv",finH:3.4,finCh:2.2,hstSpan:7.4,strut:1,pants:1,reg:"N172AW"},
   q400:{fusL:23,fusR:0.95,noseZ:1.7,span:25,chord:2.9,sweep:0.05,dih:0.02,wingY:1.0,wingZ:-0.6,
-    tail:"T",finH:5.2,finCh:3.2,hstSpan:8,nacProps:1,stripe:1},
+    tail:"T",finH:5.2,finCh:3.2,hstSpan:8,nacProps:1,stripe:1,reg:"VT-AWQ"},
   a320:{fusL:20,fusR:1.15,noseZ:1.9,span:23,chord:3.5,sweep:0.42,dih:0.10,wingY:-0.6,wingZ:-0.2,
-    tail:"conv",finH:4.8,finCh:3.0,hstSpan:8.4,winglet:1.4,pods:[0.32],stripe:1},
+    tail:"conv",finH:4.8,finCh:3.0,hstSpan:8.4,winglet:1.4,pods:[0.32],stripe:1,reg:"VT-AWA"},
   b787:{fusL:25,fusR:1.1,noseZ:2.6,span:29,chord:3.7,sweep:0.58,dih:0.13,wingY:-0.55,wingZ:0.3,
-    tail:"conv",finH:4.4,finCh:3.0,hstSpan:9,winglet:0.8,wingletBack:1,pods:[0.32],podR:1.0,stripe:1},
+    tail:"conv",finH:4.4,finCh:3.0,hstSpan:9,winglet:0.8,wingletBack:1,pods:[0.32],podR:1.0,stripe:1,reg:"VT-AWB"},
   b744:{fusL:27,fusR:1.3,noseZ:1.6,span:29,chord:4.2,sweep:0.5,dih:0.08,wingY:-0.7,wingZ:0.5,
-    tail:"conv",finH:6.2,finCh:3.6,hstSpan:10,winglet:1.6,pods:[0.3,0.56],hump:1,stripe:1},
+    tail:"conv",finH:6.2,finCh:3.6,hstSpan:10,winglet:1.6,pods:[0.3,0.56],hump:1,stripe:1,reg:"VT-AWJ"},
   conc:{fusL:27,fusR:0.72,noseZ:2,span:14,chord:8.5,sweep:0.72,dih:0,wingY:-0.35,wingZ:3.4,
-    tail:"none",finH:4.6,finCh:3.4,needle:1,strake:1,concEng:1},
+    tail:"none",finH:4.6,finCh:3.4,needle:1,strake:1,concEng:1,reg:"G-BAWC"},
   f16:{fusL:13.5,fusR:0.8,noseZ:2.2,span:9.5,chord:3.4,sweep:0.5,dih:0,wingY:0,wingZ:0.8,
-    tail:"f16",finH:3.4,finCh:2.2,hstSpan:6.6,canopy:1,intake:1,strake:1}
+    tail:"f16",finH:3.4,finCh:2.2,hstSpan:6.6,canopy:1,intake:1,strake:1,reg:"AF-16AW"}
 };
+/* livery textures: tail logo + fuselage titles/registration */
+function makeTailLogoTex(fighter){
+  const c=document.createElement("canvas");c.width=c.height=256;
+  const g=c.getContext("2d");
+  if(fighter){ /* military roundel */
+    g.strokeStyle="#e8eaee";g.lineWidth=10;
+    g.beginPath();g.arc(128,118,62,0,7);g.stroke();
+    g.fillStyle="#e8eaee";
+    g.save();g.translate(128,118);
+    g.beginPath();for(let i=0;i<5;i++){const a=-Math.PI/2+i*4*Math.PI/5;
+      g.lineTo(Math.cos(a)*46,Math.sin(a)*46);}g.closePath();g.fill();g.restore();
+  }else{ /* AETHERWING swoosh + wordmark initial */
+    g.strokeStyle="#ffffff";g.lineCap="round";
+    g.lineWidth=16;g.beginPath();g.arc(150,190,120,Math.PI*1.16,Math.PI*1.62);g.stroke();
+    g.lineWidth=10;g.beginPath();g.arc(158,206,140,Math.PI*1.2,Math.PI*1.55);g.stroke();
+    g.fillStyle="#ffffff";g.font="900 150px Segoe UI";g.textAlign="center";
+    g.fillText("A",122,168);
+  }
+  return new THREE.CanvasTexture(c);
+}
+function makeTitlesTex(reg,small){
+  const c=document.createElement("canvas");c.width=1024;c.height=128;
+  const g=c.getContext("2d");
+  g.fillStyle="#1d2c4c";
+  if(!small){
+    g.font="italic 900 66px Segoe UI";g.textAlign="left";
+    g.fillText("AETHERWING",24,84);
+    g.fillStyle="#8a2be2";g.fillRect(24,96,420,7);
+  }
+  g.fillStyle="#1d2c4c";g.font="700 44px Consolas";g.textAlign="right";
+  g.fillText(reg,1000,80);
+  return new THREE.CanvasTexture(c);
+}
 function buildAircraft(){
   if(model)acGroup.remove(model);
   model=new THREE.Group();propDiscs=[];
@@ -785,6 +862,23 @@ function buildAircraft(){
   if(G.tail!=="none"){
     const hst=new THREE.Mesh(new THREE.BoxGeometry(s*G.hstSpan,s*0.18,s*G.finCh*0.62),wingM);
     hst.position.set(0,hstY,hstZ);model.add(hst);
+  }
+  /* livery: tail logo + fuselage titles/registration */
+  const logoTex=makeTailLogoTex(!!G.canopy);
+  const titleTex=makeTitlesTex(G.reg||"AW-001",G.fusL<16);
+  for(const side of [-1,1]){
+    const lg=new THREE.Mesh(new THREE.PlaneGeometry(s*G.finCh*0.7,s*G.finH*0.58),
+      new THREE.MeshBasicMaterial({map:logoTex,transparent:true,side:THREE.DoubleSide}));
+    lg.position.set(side*(s*0.13+0.03),finBase+s*G.finH*0.56,tailZ);
+    lg.rotation.order="YXZ";lg.rotation.y=side*Math.PI/2;lg.rotation.x=-0.12;
+    if(side<0)lg.scale.x=-1;
+    model.add(lg);
+    const tt=new THREE.Mesh(new THREE.PlaneGeometry(s*G.fusL*0.44,s*G.fusL*0.055),
+      new THREE.MeshBasicMaterial({map:titleTex,transparent:true,side:THREE.DoubleSide}));
+    tt.position.set(side*s*G.fusR*0.9,s*G.fusR*0.62,G.hump?-halfL*0.02:-halfL*0.26);
+    tt.rotation.order="YXZ";tt.rotation.y=side*Math.PI/2;
+    if(side<0)tt.scale.x=-1;
+    model.add(tt);
   }
   /* ---- movable control surfaces (hinged groups on the wing halves) ---- */
   ctrlSurf={};
@@ -1318,7 +1412,7 @@ function applyEnv(){
     orb.material.color.set(ENV.time==="night"?0xdfe6ff:(ENV.time==="evening"?0xffb066:0xfff8e0));
   }
   for(const p of cityLightPts)p.visible=nightish||ENV.time==="evening";
-  for(const m of cityMats)m.emissive=new THREE.Color(nightish?0x2e2712:0x000000);
+  for(const m of cityMats)m.emissive.set(nightish?0xffb469:(ENV.time==="evening"?0x6a4526:0x000000));
   for(const m of mountainMats)m.color.multiplyScalar(1);
   for(const m of rwEdgeLights)m.size=nightish?4.5:(ENV.time==="evening"?3.6:2.4);
   if(cloudGrp)for(const sp of cloudGrp.children){
@@ -1344,9 +1438,9 @@ function buildWorld(){
   destRwZ=destZ;
   makeRunway(0,-1500,0);
   makeRunway(destX,destZ,rwyHdg);
-  makeCity(4200,-5200,360);
+  makeCity(4200,-5200);
   const dc=pathPoint(0.9,-1400);
-  makeCity(dc.x,dc.z,360);
+  makeCity(dc.x,dc.z);
   makeMountains();
   makeClouds();
   makeSky();
