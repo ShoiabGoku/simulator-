@@ -115,6 +115,19 @@
   .gstep{font-size:11px;padding:3px 2px;color:var(--dim);line-height:1.25;border-radius:4px;}
   .gstep.done{color:var(--green);}
   .gstep.cur{color:#fff;font-weight:700;background:#13233a;}
+  /* virtual joystick */
+  #stickWrap{position:absolute;right:12px;bottom:12px;width:154px;display:flex;flex-direction:column;align-items:center;gap:6px;
+    background:#0d1118ee;border:1px solid #263048;border-radius:12px;padding:10px;}
+  #stickWrap h4{font-size:10px;color:var(--dim);letter-spacing:1.5px;}
+  #stickPad{position:relative;width:118px;height:118px;border-radius:50%;
+    background:radial-gradient(circle at 50% 40%,#161d2b,#0a0e15);border:2px solid #2a3550;touch-action:none;}
+  #stickPad::before{content:"";position:absolute;inset:14px;border-radius:50%;border:1px dashed #263048;}
+  #stickKnob{position:absolute;left:50%;top:50%;width:46px;height:46px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#6b7690,#39435c 60%,#242c40);transform:translate(-50%,-50%);
+    cursor:grab;box-shadow:0 3px 10px #000c, inset 0 1px 2px #ffffff30;}
+  #stickKnob:active{cursor:grabbing;}
+  .rudRow{display:flex;gap:6px;width:100%;}
+  .rudRow .cbtn{padding:4px 2px;font-size:10px;}
   /* copilot feed */
   #copilot{position:absolute;left:10px;top:130px;width:250px;display:flex;flex-direction:column;gap:5px;}
   .cpmsg{background:#0d1118d9;border-left:3px solid var(--cyan);border-radius:0 8px 8px 0;
@@ -287,6 +300,15 @@
     </div>
   </div>
 
+  <div id="stickWrap" class="clickable">
+    <h4>SIDESTICK</h4>
+    <div id="stickPad"><div id="stickKnob"></div></div>
+    <div class="rudRow">
+      <button class="cbtn" id="rudL">&#9668; RUD</button>
+      <button class="cbtn" id="rudR">RUD &#9658;</button>
+    </div>
+  </div>
+
   <button class="chipbtn clickable" id="ovhdBtn">&#9881; OVERHEAD PANEL</button>
   <div id="ovhd" class="clickable">
     <h3>OVERHEAD &mdash; SYSTEMS</h3>
@@ -296,7 +318,9 @@
   <div id="help">
     <div class="card clickable">
       <h3>CONTROLS</h3>
-      <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> pitch (push / pull) &nbsp; <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> roll &nbsp; <kbd>A</kbd>/<kbd>D</kbd> rudder<br>
+      <b style="color:var(--cyan)">Fly with the SIDESTICK</b> (drag the round pad, bottom-right) or keys:<br>
+      <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> pitch (push / pull) &nbsp; <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> roll &nbsp; <kbd>A</kbd>/<kbd>D</kbd> or RUD buttons rudder<br>
+      Watch the wings — ailerons, elevator, rudder and flaps all move with your inputs, and the captain's yoke moves in the 3D cockpit.<br>
       <kbd>W</kbd>/<kbd>S</kbd> throttle &nbsp; <kbd>F</kbd>/<kbd>R</kbd> flaps extend / retract &nbsp; <kbd>G</kbd> gear &nbsp; <kbd>B</kbd> brakes (hold)<br>
       <kbd>X</kbd> speedbrake &nbsp; <kbd>,</kbd> parking brake &nbsp; <kbd>[</kbd>/<kbd>]</kbd> pitch trim &nbsp; A/BRK button arms autobrake<br>
       <kbd>C</kbd> or <kbd>1..5</kbd> views: cockpit / cabin / chase / tower / wing<br>
@@ -397,6 +421,7 @@ const S={
   x:0,alt:0,z:-80,spd:0,hdg:0,pitch:0,roll:0,vspd:0,gamma:0,
   n1:0,throttle:0,flaps:0,gear:true,brakes:false,rudder:0,fuel:100,
   spoiler:false,parkBrake:false,autobrake:false,trim:0,
+  ctl:{roll:0,pitch:0,yaw:0},
   onGround:true,stalled:false,ovspd:false,pitotIce:false,crashed:false,
   tdRate:0,flashT:0,shake:0,coldDark:false,
   ap:{on:false,alt:8000,hdg:360,spd:250},
@@ -642,6 +667,8 @@ function makeRain(){
 const acGroup=new THREE.Group();scene.add(acGroup);
 let model=null,gearGrp=null,propDiscs=[],lampBeacon=null,lampStrobeL=null,lampStrobeR=null,
     lampNavL=null,lampNavR=null,landSpot=null,lampTail=null,burners=[];
+let ctrlSurf={},cockpitGrp=null,ckRefs={sticks:[],levers:[]};
+const SURF={r:0,p:0,y:0,f:0};
 function lampSprite(color,s){
   const c=document.createElement("canvas");c.width=c.height=64;
   const g=c.getContext("2d");
@@ -680,6 +707,27 @@ function buildAircraft(){
   fin.position.set(0,s*2.6,s*11);model.add(fin);
   const hst=new THREE.Mesh(new THREE.BoxGeometry(s*8.4,s*0.2,s*2),wingM);
   hst.position.set(0,s*0.5,s*11.2);model.add(hst);
+  /* ---- movable control surfaces (hinged groups) ---- */
+  ctrlSurf={};
+  const surfM=new THREE.MeshLambertMaterial({color:0xaab2bc});
+  function hingedSurf(w,t,chord,x,y,z){
+    const g=new THREE.Group();g.position.set(x,y,z);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,t,chord),surfM);
+    m.position.z=chord/2; /* surface trails behind the hinge line */
+    g.add(m);model.add(g);return g;
+  }
+  const wte=-s*0.4+s*1.6; /* wing trailing edge */
+  ctrlSurf.ailL=hingedSurf(s*4.6,s*0.1,s*0.95,-s*8.6,wy,wte);
+  ctrlSurf.ailR=hingedSurf(s*4.6,s*0.1,s*0.95, s*8.6,wy,wte);
+  ctrlSurf.flapL=hingedSurf(s*4.6,s*0.1,s*1.1,-s*3.4,wy-s*0.03,wte);
+  ctrlSurf.flapR=hingedSurf(s*4.6,s*0.1,s*1.1, s*3.4,wy-s*0.03,wte);
+  ctrlSurf.elev=hingedSurf(s*7.8,s*0.09,s*0.85,0,s*0.5,s*12.2);
+  /* rudder hinges about the vertical axis */
+  const rudG=new THREE.Group();rudG.position.set(0,s*2.7,s*12.3);
+  const rudMesh=new THREE.Mesh(new THREE.BoxGeometry(s*0.14,s*3.4,s*0.95),
+    new THREE.MeshLambertMaterial({color:AC.tail}));
+  rudMesh.position.z=s*0.48;rudG.add(rudMesh);model.add(rudG);
+  ctrlSurf.rud=rudG;
   /* engines */
   burners=[];
   function addBurner(x,y,z){
@@ -737,6 +785,107 @@ function buildAircraft(){
   /* wheel height so plane sits on ground */
   model.userData.gearH=s*2.5+s*0.9;
   acGroup.add(model);
+  buildCockpit(s);
+}
+
+/* ---------------- 3D COCKPIT INTERIOR (pilot's seat view) ---------------- */
+function buildCockpit(s){
+  if(cockpitGrp)acGroup.remove(cockpitGrp);
+  cockpitGrp=new THREE.Group();ckRefs={sticks:[],levers:[]};
+  const dk=new THREE.MeshLambertMaterial({color:0x14171d});
+  const dk2=new THREE.MeshLambertMaterial({color:0x0b0d11});
+  const grey=new THREE.MeshLambertMaterial({color:0x2a2f3a});
+  const scrM=new THREE.MeshBasicMaterial({color:0x0d3a42});
+  const single=AC.engines===1&&AC.type==="jet"; /* f16: one seat, centred */
+  const seatX=single?0:s*0.55;
+  /* main panel + glareshield */
+  const panel=new THREE.Mesh(new THREE.BoxGeometry(s*2.7,s*0.8,s*0.5),dk);
+  panel.position.set(0,s*1.02,-s*8.3);cockpitGrp.add(panel);
+  const glare=new THREE.Mesh(new THREE.BoxGeometry(s*2.85,s*0.14,s*0.75),dk2);
+  glare.position.set(0,s*1.46,-s*8.2);cockpitGrp.add(glare);
+  for(const px of (single?[-0.35,0.35]:[-0.95,-0.45,0.45,0.95])){
+    const scr=new THREE.Mesh(new THREE.PlaneGeometry(s*0.4,s*0.32),scrM);
+    scr.position.set(px*s,s*1.1,-s*8.04);cockpitGrp.add(scr);
+  }
+  /* window frame: roof bar, A-pillars, centre post */
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(s*3.1,s*0.18,s*0.6),dk2);
+  roof.position.set(0,s*2.16,-s*7.85);cockpitGrp.add(roof);
+  for(const sd of [-1,1]){
+    const pil=new THREE.Mesh(new THREE.BoxGeometry(s*0.16,s*1.15,s*0.14),dk2);
+    pil.position.set(sd*s*1.42,s*1.8,-s*8.05);pil.rotation.z=sd*0.42;cockpitGrp.add(pil);
+  }
+  if(!single){
+    const post=new THREE.Mesh(new THREE.BoxGeometry(s*0.07,s*0.8,s*0.1),dk2);
+    post.position.set(0,s*1.82,-s*8.15);cockpitGrp.add(post);
+  }
+  /* centre pedestal + throttle levers (animate with S.throttle) */
+  const ped=new THREE.Mesh(new THREE.BoxGeometry(s*0.52,s*0.5,s*1.5),dk);
+  ped.position.set(0,s*0.6,-s*7.2);cockpitGrp.add(ped);
+  const nLev=Math.min(AC.engines,4);
+  for(let i=0;i<nLev;i++){
+    const lg=new THREE.Group();
+    lg.position.set((i-(nLev-1)/2)*s*0.12,s*0.86,-s*7.45);
+    const lever=new THREE.Mesh(new THREE.BoxGeometry(s*0.07,s*0.4,s*0.08),grey);
+    lever.position.y=s*0.2;lg.add(lever);
+    const knob=new THREE.Mesh(new THREE.SphereGeometry(s*0.06,8,6),dk2);
+    knob.position.y=s*0.42;lg.add(knob);
+    cockpitGrp.add(lg);ckRefs.levers.push(lg);
+  }
+  /* crew figure builder */
+  const skin=new THREE.MeshLambertMaterial({color:0xd9a06b});
+  const shirt=new THREE.MeshLambertMaterial({color:0xe8ecf2});
+  const navy=new THREE.MeshLambertMaterial({color:0x1d2c4c});
+  function crew(x){
+    const g=new THREE.Group();
+    const seat=new THREE.Mesh(new THREE.BoxGeometry(s*0.5,s*0.85,s*0.3),new THREE.MeshLambertMaterial({color:0x23262e}));
+    seat.position.set(0,s*0.85,s*0.22);g.add(seat);
+    const torso=new THREE.Mesh(new THREE.BoxGeometry(s*0.44,s*0.52,s*0.28),shirt);
+    torso.position.y=s*1.0;g.add(torso);
+    for(const sd of [-1,1]){ /* epaulettes + arms */
+      const ep=new THREE.Mesh(new THREE.BoxGeometry(s*0.12,s*0.04,s*0.12),navy);
+      ep.position.set(sd*s*0.17,s*1.27,0);g.add(ep);
+      const arm=new THREE.Mesh(new THREE.BoxGeometry(s*0.09,s*0.38,s*0.09),shirt);
+      arm.position.set(sd*s*0.24,s*1.02,-s*0.1);arm.rotation.x=0.5;g.add(arm);
+    }
+    const head=new THREE.Mesh(new THREE.SphereGeometry(s*0.16,10,8),skin);
+    head.position.y=s*1.42;g.add(head);
+    const cap=new THREE.Mesh(new THREE.CylinderGeometry(s*0.17,s*0.17,s*0.07,10),navy);
+    cap.position.y=s*1.53;g.add(cap);
+    g.position.set(x,0,-s*6.95);
+    cockpitGrp.add(g);return g;
+  }
+  crew(-seatX);              /* captain (you) — sits just behind the camera */
+  if(!single)crew(seatX);    /* first officer */
+  /* flight controls: sidestick (A320/F16) or yoke — pilot's moves, FO's static */
+  const sidestick=(AC===AIRCRAFT.a320||AC===AIRCRAFT.f16);
+  function makeControl(x,isPilot){
+    const g=new THREE.Group();
+    if(sidestick){
+      const st=new THREE.Mesh(new THREE.CylinderGeometry(s*0.035,s*0.05,s*0.34,8),grey);
+      st.position.y=s*0.17;g.add(st);
+      const grip=new THREE.Mesh(new THREE.SphereGeometry(s*0.07,8,6),dk2);
+      grip.position.y=s*0.36;g.add(grip);
+      g.position.set(x+(x<0?-s*0.34:(x>0?s*0.34:s*0.3)),s*0.72,-s*7.5);
+    }else{
+      const col=new THREE.Mesh(new THREE.CylinderGeometry(s*0.05,s*0.06,s*0.5,8),grey);
+      col.position.y=s*0.25;g.add(col);
+      const wheel=new THREE.Group();wheel.position.y=s*0.52;
+      const rim=new THREE.Mesh(new THREE.TorusGeometry(s*0.17,s*0.035,8,14,Math.PI*1.25),dk2);
+      rim.rotation.z=Math.PI*0.875;wheel.add(rim);
+      const bar=new THREE.Mesh(new THREE.BoxGeometry(s*0.3,s*0.04,s*0.05),dk2);
+      wheel.add(bar);g.add(wheel);
+      g.userData.wheel=wheel;
+      g.position.set(x,s*0.68,-s*7.62);
+    }
+    cockpitGrp.add(g);
+    if(isPilot)ckRefs.sticks.push({grp:g,wheel:g.userData.wheel,side:sidestick});
+    return g;
+  }
+  makeControl(-seatX,true);
+  if(!single)makeControl(seatX,false);
+  cockpitGrp.visible=false;
+  cockpitGrp.userData.seatX=-seatX;
+  acGroup.add(cockpitGrp);
 }
 
 /* ---------------- ENVIRONMENT APPLY ---------------- */
@@ -1491,6 +1640,8 @@ function autopilot(dt){
   if(!S.ap.on)return;
   const hdgErr=wrap180(S.ap.hdg-S.hdg);
   const tgtRoll=clamp(hdgErr*1.4,-26,26);
+  S.ctl.roll=clamp((tgtRoll-S.roll)/18,-1,1);   /* servo mirrors onto surfaces & yoke */
+  S.ctl.pitch=clamp((S.ap.alt-S.alt/FT2M)/2200,-1,1);
   S.roll+=(tgtRoll-S.roll)*Math.min(1,1.6*dt);
   const altErr=S.ap.alt-S.alt/FT2M;
   const tgtVs=clamp(altErr*1.1,-1600,1800)/196.85;
@@ -1567,7 +1718,7 @@ let chaseInit=false;
 function setView(v){
   S.view=((v%5)+5)%5;
   document.getElementById("tbView").textContent=VIEWS[S.view];
-  document.getElementById("dash").style.display=S.view===0?"block":"none";
+  document.getElementById("dash").style.display="none"; /* replaced by 3D cockpit interior */
   document.getElementById("cabin").style.display=S.view===1?"block":"none";
   document.getElementById("instWrap").style.display=(S.view===0)?"block":"none";
   chaseInit=false;
@@ -1582,11 +1733,13 @@ function updateCamera(dt){
   const shk=S.shake;
   const shx=(Math.random()-0.5)*shk,shy=(Math.random()-0.5)*shk;
   model.visible=S.view!==0;
-  if(S.view===0){ /* cockpit */
-    tmpV.set(shx*0.4,s*1.5+shy*0.4,-s*8);
+  if(cockpitGrp)cockpitGrp.visible=S.view===0;
+  if(S.view===0){ /* cockpit — from the captain's seat */
+    const seatX=cockpitGrp?cockpitGrp.userData.seatX:0;
+    tmpV.set(seatX+shx*0.4,s*1.58+shy*0.4,-s*7.55);
     acGroup.localToWorld(tmpV);camera.position.copy(tmpV);
     camera.quaternion.setFromEuler(new THREE.Euler(S.pitch*D2R+shy*0.01,-S.hdg*D2R+shx*0.01,-S.roll*D2R,"YXZ"));
-    camera.fov=68;
+    camera.fov=70;
   }else if(S.view===1){ /* cabin — look out right window */
     tmpV.set(s*0.9,s*0.8,s*2.2);
     acGroup.localToWorld(tmpV);camera.position.copy(tmpV);
@@ -1633,6 +1786,31 @@ function lampsTick(dt){
   for(const d of propDiscs){d.rotation.z+=S.n1*40*dt;d.material.opacity=0.05+S.n1*0.16;}
   const ab=(AC.reheat&&S.throttle>0.86&&enginesRunning()>0)?(0.55+Math.random()*0.45):0;
   for(const b of burners)b.material.opacity=ab;
+}
+
+/* ---------------- CONTROL SURFACES & COCKPIT ANIMATION ---------------- */
+function surfacesTick(dt){
+  if(!ctrlSurf.ailL)return;
+  const k=Math.min(1,10*dt);
+  SURF.r+=(S.ctl.roll -SURF.r)*k;
+  SURF.p+=(S.ctl.pitch-SURF.p)*k;
+  SURF.y+=(S.ctl.yaw  -SURF.y)*k;
+  SURF.f+=((S.flaps/3)-SURF.f)*Math.min(1,1.2*dt); /* flaps travel slowly */
+  /* roll right → right aileron up, left aileron down */
+  ctrlSurf.ailL.rotation.x= SURF.r*0.38;
+  ctrlSurf.ailR.rotation.x=-SURF.r*0.38;
+  /* pull → elevator trailing edge up */
+  ctrlSurf.elev.rotation.x=-SURF.p*0.32;
+  ctrlSurf.rud.rotation.y=-SURF.y*0.4;
+  ctrlSurf.flapL.rotation.x=SURF.f*0.6;
+  ctrlSurf.flapR.rotation.x=SURF.f*0.6;
+  if(S.spoiler&&ctrlSurf.flapL){/* spoilers borrow a visual: slight flap split */}
+  /* pilot's stick / yoke follows inputs */
+  for(const st of ckRefs.sticks){
+    if(st.side){st.grp.rotation.z=-SURF.r*0.45;st.grp.rotation.x=-SURF.p*0.4;}
+    else{st.grp.rotation.x=-SURF.p*0.22;if(st.wheel)st.wheel.rotation.z=-SURF.r*1.3;}
+  }
+  for(const lg of ckRefs.levers)lg.rotation.x=0.42-S.throttle*0.82;
 }
 
 /* ---------------- ANNUNCIATORS / READOUTS ---------------- */
@@ -1718,24 +1896,55 @@ function cycleAccel(){
   document.getElementById("btnTime").textContent=S.tAccel+"x [T]";
 }
 function controlsTick(dt){
-  if(S.ap.on)
-    {if(KEYS.ArrowUp||KEYS.ArrowDown||KEYS.ArrowLeft||KEYS.ArrowRight){S.ap.on=false;copilot("Autopilot disconnected — your aircraft.");say("Autopilot.");}}
+  /* stick inputs: arrows + virtual joystick combined, -1..1 */
+  let rIn=0,pIn=0;
+  if(KEYS.ArrowLeft)rIn-=1; if(KEYS.ArrowRight)rIn+=1;
+  if(KEYS.ArrowDown)pIn+=1; if(KEYS.ArrowUp)pIn-=1;   /* pull = nose up */
+  rIn=clamp(rIn+JOY.x,-1,1); pIn=clamp(pIn+JOY.y,-1,1);
+  const handsOn=Math.abs(rIn)>0.06||Math.abs(pIn)>0.06;
+  if(S.ap.on&&handsOn){S.ap.on=false;copilot("Autopilot disconnected — your aircraft.");say("Autopilot.");}
   if(!S.ap.on){
     const rr=42*(AC.roll||1), pr=14*(AC.roll?0.6+0.4*AC.roll:1);
-    if(KEYS.ArrowDown)S.pitch+=pr*dt;
-    if(KEYS.ArrowUp)S.pitch-=pr*dt;
-    if(KEYS.ArrowLeft)S.roll-=rr*dt;
-    if(KEYS.ArrowRight)S.roll+=rr*dt;
+    S.pitch+=pIn*pr*dt;
+    S.roll+=rIn*rr*dt;
+    S.ctl.roll=rIn;S.ctl.pitch=pIn;
   }
   /* pitch trim eases hands-off pitch toward the trim setting */
-  if(!S.ap.on&&!S.onGround&&!KEYS.ArrowUp&&!KEYS.ArrowDown)S.pitch+=(S.trim-S.pitch)*0.4*dt;
+  if(!S.ap.on&&!S.onGround&&!handsOn)S.pitch+=(S.trim-S.pitch)*0.4*dt;
   S.rudder=0;
   if(KEYS.a||KEYS.A)S.rudder=-1;
   if(KEYS.d||KEYS.D)S.rudder=1;
+  S.rudder=clamp(S.rudder+JOY.r,-1,1);
+  S.ctl.yaw=S.rudder;
   if(KEYS.w||KEYS.W)S.throttle=clamp(S.throttle+0.45*dt,0,1);
   if(KEYS.s||KEYS.S)S.throttle=clamp(S.throttle-0.45*dt,0,1);
   if(KEYS.w||KEYS.W||KEYS.s||KEYS.S)document.getElementById("throttle").value=Math.round(S.throttle*100);
 }
+
+/* ---------------- VIRTUAL JOYSTICK ---------------- */
+const JOY={x:0,y:0,r:0};
+(function(){
+  const pad=document.getElementById("stickPad"),knob=document.getElementById("stickKnob");
+  let active=false;
+  function setKnob(){knob.style.transform="translate(-50%,-50%) translate("+(JOY.x*36)+"px,"+(JOY.y*36)+"px)";}
+  function fromEvent(e){
+    const rc=pad.getBoundingClientRect();
+    const dx=(e.clientX-rc.left-rc.width/2)/(rc.width/2-8);
+    const dy=(e.clientY-rc.top-rc.height/2)/(rc.height/2-8);
+    const m=Math.hypot(dx,dy), f=m>1?1/m:1;
+    JOY.x=clamp(dx*f,-1,1);JOY.y=clamp(dy*f,-1,1);setKnob();
+  }
+  pad.addEventListener("pointerdown",e=>{active=true;pad.setPointerCapture(e.pointerId);fromEvent(e);});
+  pad.addEventListener("pointermove",e=>{if(active)fromEvent(e);});
+  const release=e=>{active=false;JOY.x=0;JOY.y=0;setKnob();};
+  pad.addEventListener("pointerup",release);
+  pad.addEventListener("pointercancel",release);
+  for(const [id,v] of [["rudL",-1],["rudR",1]]){
+    const b=document.getElementById(id);
+    b.onpointerdown=()=>{JOY.r=v;};
+    b.onpointerup=b.onpointerleave=()=>{JOY.r=0;};
+  }
+})();
 
 /* UI wiring */
 document.getElementById("throttle").addEventListener("input",e=>{S.throttle=+e.target.value/100;});
@@ -1915,6 +2124,7 @@ function loop(){
     S.flashT=Math.max(0,S.flashT-dt*1.4);
   }else updateSystems(0);
   lampsTick(dt);
+  surfacesTick(dt);
   updateCamera(dt);
   /* rain follows camera */
   if(rainPts&&rainPts.visible){
