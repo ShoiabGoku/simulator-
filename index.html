@@ -789,47 +789,73 @@ function buildAircraft(){
 }
 
 /* ---------------- 3D COCKPIT INTERIOR (pilot's seat view) ---------------- */
+let CKD=null; /* live cockpit display textures */
+function mkTex(w,h){
+  const c=document.createElement("canvas");c.width=w;c.height=h;
+  const ctx=c.getContext("2d");
+  const tex=new THREE.CanvasTexture(c);tex.minFilter=THREE.LinearFilter;
+  return {c,ctx,tex};
+}
 function buildCockpit(s){
   if(cockpitGrp)acGroup.remove(cockpitGrp);
   cockpitGrp=new THREE.Group();ckRefs={sticks:[],levers:[]};
   const dk=new THREE.MeshLambertMaterial({color:0x14171d});
   const dk2=new THREE.MeshLambertMaterial({color:0x0b0d11});
   const grey=new THREE.MeshLambertMaterial({color:0x2a2f3a});
-  const scrM=new THREE.MeshBasicMaterial({color:0x0d3a42});
   const single=AC.engines===1&&AC.type==="jet"; /* f16: one seat, centred */
   const seatX=single?0:s*0.55;
-  /* main panel + glareshield */
-  const panel=new THREE.Mesh(new THREE.BoxGeometry(s*2.7,s*0.8,s*0.5),dk);
-  panel.position.set(0,s*1.02,-s*8.3);cockpitGrp.add(panel);
-  const glare=new THREE.Mesh(new THREE.BoxGeometry(s*2.85,s*0.14,s*0.75),dk2);
-  glare.position.set(0,s*1.46,-s*8.2);cockpitGrp.add(glare);
-  for(const px of (single?[-0.35,0.35]:[-0.95,-0.45,0.45,0.95])){
-    const scr=new THREE.Mesh(new THREE.PlaneGeometry(s*0.4,s*0.32),scrM);
-    scr.position.set(px*s,s*1.1,-s*8.04);cockpitGrp.add(scr);
+  /* live display textures */
+  CKD={pfd:mkTex(256,204),nd:mkTex(256,204),eicas:mkTex(256,204),
+       mcp:mkTex(1024,96),ovhd:mkTex(640,760),panel:mkTex(1024,300),cdu:mkTex(256,256),
+       t:9,ovhdDirty:true};
+  drawPanelTex();drawCDU();
+  const M=t=>new THREE.MeshBasicMaterial({map:t.tex});
+  /* main panel (textured face) + glareshield */
+  const panelBox=new THREE.Mesh(new THREE.BoxGeometry(s*3.0,s*0.95,s*0.5),dk);
+  panelBox.position.set(0,s*1.02,-s*8.32);cockpitGrp.add(panelBox);
+  const panelFace=new THREE.Mesh(new THREE.PlaneGeometry(s*3.0,s*0.95),M(CKD.panel));
+  panelFace.position.set(0,s*1.02,-s*8.068);cockpitGrp.add(panelFace);
+  const glare=new THREE.Mesh(new THREE.BoxGeometry(s*3.0,s*0.16,s*0.8),dk2);
+  glare.position.set(0,s*1.55,-s*8.15);cockpitGrp.add(glare);
+  /* MCP autopilot strip on the glareshield face */
+  const mcp=new THREE.Mesh(new THREE.PlaneGeometry(s*2.6,s*0.17),M(CKD.mcp));
+  mcp.position.set(0,s*1.545,-s*7.745);cockpitGrp.add(mcp);
+  /* displays: PFD | ND | EICAS | ND | PFD (f16: PFD | ND) */
+  const layout=single?[["pfd",-0.35],["nd",0.35]]:[["pfd",-0.98],["nd",-0.5],["eicas",0],["nd",0.5],["pfd",0.98]];
+  for(const [kind,px] of layout){
+    const scr=new THREE.Mesh(new THREE.PlaneGeometry(s*0.44,s*0.35),M(CKD[kind]));
+    scr.position.set(px*s,s*1.06,-s*8.06);cockpitGrp.add(scr);
   }
+  /* overhead console sloping down to the windshield top */
+  const ovhd=new THREE.Mesh(new THREE.PlaneGeometry(s*(single?1.8:2.6),s*1.05),M(CKD.ovhd));
+  ovhd.position.set(0,s*2.26,-s*8.0);ovhd.rotation.x=1.18;cockpitGrp.add(ovhd);
   /* window frame: roof bar, A-pillars, centre post */
-  const roof=new THREE.Mesh(new THREE.BoxGeometry(s*3.1,s*0.18,s*0.6),dk2);
-  roof.position.set(0,s*2.16,-s*7.85);cockpitGrp.add(roof);
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(s*3.2,s*0.16,s*0.5),dk2);
+  roof.position.set(0,s*2.2,-s*8.35);cockpitGrp.add(roof);
   for(const sd of [-1,1]){
     const pil=new THREE.Mesh(new THREE.BoxGeometry(s*0.16,s*1.15,s*0.14),dk2);
-    pil.position.set(sd*s*1.42,s*1.8,-s*8.05);pil.rotation.z=sd*0.42;cockpitGrp.add(pil);
+    pil.position.set(sd*s*1.46,s*1.82,-s*8.05);pil.rotation.z=sd*0.42;cockpitGrp.add(pil);
   }
   if(!single){
-    const post=new THREE.Mesh(new THREE.BoxGeometry(s*0.07,s*0.8,s*0.1),dk2);
-    post.position.set(0,s*1.82,-s*8.15);cockpitGrp.add(post);
+    const post=new THREE.Mesh(new THREE.BoxGeometry(s*0.08,s*0.75,s*0.1),dk2);
+    post.position.set(0,s*1.86,-s*8.2);cockpitGrp.add(post);
   }
-  /* centre pedestal + throttle levers (animate with S.throttle) */
-  const ped=new THREE.Mesh(new THREE.BoxGeometry(s*0.52,s*0.5,s*1.5),dk);
+  /* centre pedestal: throttles + CDUs */
+  const ped=new THREE.Mesh(new THREE.BoxGeometry(s*0.8,s*0.5,s*1.5),dk);
   ped.position.set(0,s*0.6,-s*7.2);cockpitGrp.add(ped);
   const nLev=Math.min(AC.engines,4);
   for(let i=0;i<nLev;i++){
     const lg=new THREE.Group();
-    lg.position.set((i-(nLev-1)/2)*s*0.12,s*0.86,-s*7.45);
-    const lever=new THREE.Mesh(new THREE.BoxGeometry(s*0.07,s*0.4,s*0.08),grey);
+    lg.position.set((i-(nLev-1)/2)*s*0.11,s*0.86,-s*7.45);
+    const lever=new THREE.Mesh(new THREE.BoxGeometry(s*0.06,s*0.4,s*0.07),grey);
     lever.position.y=s*0.2;lg.add(lever);
-    const knob=new THREE.Mesh(new THREE.SphereGeometry(s*0.06,8,6),dk2);
+    const knob=new THREE.Mesh(new THREE.SphereGeometry(s*0.055,8,6),dk2);
     knob.position.y=s*0.42;lg.add(knob);
     cockpitGrp.add(lg);ckRefs.levers.push(lg);
+  }
+  if(!single)for(const sd of [-1,1]){ /* CDU keyboards flanking the throttles */
+    const cdu=new THREE.Mesh(new THREE.PlaneGeometry(s*0.28,s*0.34),M(CKD.cdu));
+    cdu.position.set(sd*s*0.27,s*0.9,-s*7.55);cdu.rotation.x=-0.9;cockpitGrp.add(cdu);
   }
   /* crew figure builder */
   const skin=new THREE.MeshLambertMaterial({color:0xd9a06b});
@@ -886,6 +912,280 @@ function buildCockpit(s){
   cockpitGrp.visible=false;
   cockpitGrp.userData.seatX=-seatX;
   acGroup.add(cockpitGrp);
+}
+
+/* ---------------- LIVE GLASS-COCKPIT DISPLAYS ---------------- */
+function drawPFD(){
+  const g=CKD.pfd.ctx;
+  g.fillStyle="#04070a";g.fillRect(0,0,256,204);
+  /* attitude sphere */
+  g.save();g.beginPath();g.rect(60,26,136,150);g.clip();
+  g.translate(128,101);g.rotate(-S.roll*D2R);
+  const po=clamp(S.pitch,-35,35)*3;
+  g.fillStyle="#1560c0";g.fillRect(-160,-190+po,320,190);
+  g.fillStyle="#8a5a26";g.fillRect(-160,po,320,190);
+  g.strokeStyle="#fff";g.lineWidth=1.6;
+  g.beginPath();g.moveTo(-160,po);g.lineTo(160,po);g.stroke();
+  g.font="8px Consolas";g.fillStyle="#fff";g.textAlign="center";g.lineWidth=1;
+  for(const p of [-20,-10,10,20]){
+    const yy=po-p*3, w=Math.abs(p)%20===0?26:16;
+    g.beginPath();g.moveTo(-w,yy);g.lineTo(w,yy);g.stroke();
+    g.fillText(Math.abs(p),w+11,yy+3);
+  }
+  g.restore();
+  /* roll scale + pointer */
+  g.strokeStyle="#fff";g.beginPath();g.arc(128,101,66,Math.PI*1.17,Math.PI*1.83);g.stroke();
+  g.save();g.translate(128,101);g.rotate(-S.roll*D2R);
+  g.fillStyle="#ffd34d";g.beginPath();g.moveTo(0,-60);g.lineTo(-5,-50);g.lineTo(5,-50);g.fill();g.restore();
+  /* aircraft symbol */
+  g.strokeStyle="#ffd34d";g.lineWidth=3;
+  g.beginPath();g.moveTo(96,101);g.lineTo(116,101);g.lineTo(122,108);g.moveTo(160,101);g.lineTo(140,101);g.lineTo(134,108);g.stroke();
+  g.fillStyle="#ffd34d";g.fillRect(126,99,4,4);
+  /* speed tape */
+  g.fillStyle="#1a2129";g.fillRect(0,26,56,150);
+  g.font="10px Consolas";g.textAlign="right";
+  const shown=S.pitotIce&&S.flags.frozenIas!==undefined?S.flags.frozenIas:S.spd;
+  for(let k=-3;k<=3;k++){
+    const v=Math.round(shown/20)*20+k*20;if(v<0)continue;
+    const y=101-(v-shown)*1.7;
+    if(y>30&&y<172){g.fillStyle="#cfd8e4";g.fillText(v,40,y+3);
+      g.strokeStyle="#5a6478";g.beginPath();g.moveTo(44,y);g.lineTo(52,y);g.stroke();}
+  }
+  g.fillStyle="#000";g.fillRect(2,91,50,20);g.strokeStyle="#ffd34d";g.strokeRect(2,91,50,20);
+  g.fillStyle="#fff";g.font="bold 13px Consolas";g.fillText(Math.round(shown),44,106);
+  /* altitude tape */
+  const ft=S.alt/FT2M;
+  g.fillStyle="#1a2129";g.fillRect(200,26,56,150);
+  g.font="10px Consolas";g.textAlign="left";
+  for(let k=-3;k<=3;k++){
+    const v=Math.round(ft/200)*200+k*200;if(v<0)continue;
+    const y=101-(v-ft)*0.17;
+    if(y>30&&y<172){g.fillStyle="#cfd8e4";g.fillText(v,214,y+3);
+      g.strokeStyle="#5a6478";g.beginPath();g.moveTo(204,y);g.lineTo(210,y);g.stroke();}
+  }
+  g.fillStyle="#000";g.fillRect(202,91,52,20);g.strokeStyle="#ffd34d";g.strokeRect(202,91,52,20);
+  g.fillStyle="#fff";g.font="bold 12px Consolas";g.fillText(Math.round(ft),206,106);
+  /* FMA */
+  g.font="bold 9px Consolas";g.textAlign="center";g.fillStyle="#59d98c";
+  g.fillText(S.ap.on?"SPD":"MAN",40,14);
+  g.fillText(S.ap.on?"HDG "+pad3(S.ap.hdg):"---",128,14);
+  g.fillText(S.ap.on?"ALT "+S.ap.alt:"---",216,14);
+  if(S.ap.on){g.fillStyle="#fff";g.fillText("AP1",128,24);}
+  /* heading readout + VS */
+  g.fillStyle="#59d98c";g.font="bold 10px Consolas";
+  g.fillText("HDG "+pad3(S.hdg),128,196);
+  const fpm=Math.round(S.vspd/FT2M*60/50)*50;
+  g.textAlign="right";g.fillStyle=fpm<-1500?"#ff8080":"#cfd8e4";g.fillText((fpm>0?"+":"")+fpm+" FPM",254,196);
+  g.textAlign="left";g.fillStyle=S.stalled?"#ff4040":"#cfd8e4";g.fillText(S.stalled?"STALL":"",4,196);
+  CKD.pfd.tex.needsUpdate=true;
+}
+function drawND(){
+  const g=CKD.nd.ctx;
+  g.fillStyle="#04070a";g.fillRect(0,0,256,204);
+  const cx=128,cy=150;
+  /* range rings + rose */
+  g.strokeStyle="#2c4a3c";g.lineWidth=1;
+  for(const r of [55,110]){g.beginPath();g.arc(cx,cy,r,Math.PI,2*Math.PI);g.stroke();}
+  g.save();g.translate(cx,cy);
+  g.font="8px Consolas";g.fillStyle="#8fd6a8";g.textAlign="center";
+  for(let a=0;a<360;a+=30){
+    const rel=(a-S.hdg)*D2R;
+    g.save();g.rotate(rel);
+    g.strokeStyle="#3c5c4c";g.beginPath();g.moveTo(0,-110);g.lineTo(0,-104);g.stroke();
+    g.fillText(a===0?"N":a/10,0,-114);g.restore();
+  }
+  /* track to destination (magenta) */
+  const brg=(bearingToDest()-S.hdg)*D2R;
+  const rr=clamp(remainingNm()/RT.nm,0.06,1)*100+8;
+  g.save();g.rotate(brg);
+  g.strokeStyle="#e06fff";g.lineWidth=2;g.setLineDash([7,5]);
+  g.beginPath();g.moveTo(0,-8);g.lineTo(0,-rr);g.stroke();g.setLineDash([]);
+  g.fillStyle="#e06fff";g.fillRect(-5,-rr-5,10,10);
+  g.restore();g.restore();
+  /* own-ship */
+  g.fillStyle="#fff";g.beginPath();g.moveTo(cx,cy-9);g.lineTo(cx+7,cy+7);g.lineTo(cx-7,cy+7);g.closePath();g.fill();
+  /* data blocks */
+  g.font="bold 10px Consolas";g.textAlign="left";g.fillStyle="#59d98c";
+  g.fillText("GS "+Math.round(S.spd*0.98),6,16);
+  g.fillText("TO "+RT.to,6,28);
+  g.textAlign="right";g.fillStyle="#e06fff";
+  g.fillText(remainingNm().toFixed(remainingNm()<10?1:0)+" NM",250,16);
+  g.fillStyle="#59d98c";g.fillText("BRG "+pad3(bearingToDest()),250,28);
+  g.textAlign="center";g.fillStyle="#fff";g.font="bold 11px Consolas";
+  g.fillText(pad3(S.hdg),cx,14);
+  g.strokeStyle="#ffd34d";g.strokeRect(cx-18,4,36,13);
+  CKD.nd.tex.needsUpdate=true;
+}
+function drawEICAS(){
+  const g=CKD.eicas.ctx;
+  g.fillStyle="#04070a";g.fillRect(0,0,256,204);
+  const n=AC.engines,w=256/n;
+  for(let i=0;i<n;i++){
+    const e=S.eng[i]||{running:false,n2:0,egt:0};
+    const val=e.running?S.n1:e.n2;
+    const cx=w/2+i*w,cy=58,r=Math.min(26,w*0.3);
+    g.strokeStyle="#3a4356";g.lineWidth=4;
+    g.beginPath();g.arc(cx,cy,r,Math.PI*0.75,Math.PI*2.25);g.stroke();
+    g.strokeStyle=val>0.95?"#ff8080":"#59d98c";
+    g.beginPath();g.arc(cx,cy,r,Math.PI*0.75,Math.PI*(0.75+1.5*val));g.stroke();
+    g.fillStyle="#fff";g.font="bold 12px Consolas";g.textAlign="center";
+    g.fillText(Math.round(val*100),cx,cy+4);
+    g.fillStyle="#8a94a8";g.font="8px Consolas";g.fillText("N1-"+(i+1),cx,cy+r+12);
+    /* EGT bar */
+    g.fillStyle="#161c28";g.fillRect(cx-14,108,28,8);
+    g.fillStyle="#ff9a5a";g.fillRect(cx-14,108,28*e.egt,8);
+  }
+  g.font="bold 10px Consolas";g.textAlign="left";
+  g.fillStyle="#59d98c";g.fillText("FLAPS "+S.flaps,10,140);
+  g.fillStyle=S.gear?"#59d98c":"#8a94a8";g.fillText("GEAR "+(S.gear?"DN":"UP"),10,154);
+  g.fillStyle=S.spoiler?"#ffd34d":"#8a94a8";g.fillText("SPLR "+(S.spoiler?"OUT":"IN"),10,168);
+  g.fillStyle=S.fuel<20?"#ff8080":"#5fd4d0";g.fillText("FUEL "+Math.round(S.fuel)+"%",10,182);
+  g.textAlign="right";
+  g.fillStyle=PWR.elec?"#59d98c":"#ff8080";g.fillText("ELEC",246,140);
+  if(AC.apu){g.fillStyle=S.apu.state==="avail"?"#59d98c":(S.apu.state==="start"?"#ffd34d":"#8a94a8");
+    g.fillText("APU "+(S.apu.state==="avail"?"AVAIL":S.apu.state==="start"?Math.round(S.apu.spool*100)+"%":"OFF"),246,154);}
+  g.fillStyle=PWR.bleed?"#59d98c":"#8a94a8";g.fillText("BLEED",246,168);
+  g.fillStyle="#8a94a8";g.fillText("THR "+Math.round(S.throttle*100)+"%",246,182);
+  CKD.eicas.tex.needsUpdate=true;
+}
+function drawMCP(){
+  const g=CKD.mcp.ctx;
+  const grd=g.createLinearGradient(0,0,0,96);
+  grd.addColorStop(0,"#242019");grd.addColorStop(1,"#15120c");
+  g.fillStyle=grd;g.fillRect(0,0,1024,96);
+  g.strokeStyle="#3d372c";g.strokeRect(1,1,1022,94);
+  function win(x,w,label,val){
+    g.fillStyle="#9fd68a";g.font="9px Consolas";g.textAlign="center";g.fillText(label,x+w/2,16);
+    g.fillStyle="#000";g.fillRect(x,22,w,26);g.strokeStyle="#4a4438";g.strokeRect(x,22,w,26);
+    g.fillStyle="#ffe9c8";g.font="bold 17px Consolas";g.fillText(val,x+w/2,42);
+    /* knob under the window */
+    const kx=x+w/2;
+    const kg=g.createRadialGradient(kx-3,66,2,kx,70,14);
+    kg.addColorStop(0,"#8a8272");kg.addColorStop(1,"#3a352b");
+    g.fillStyle=kg;g.beginPath();g.arc(kx,70,13,0,7);g.fill();
+    g.strokeStyle="#1c1914";g.stroke();
+  }
+  win(120,84,"SPD",S.ap.spd);
+  win(300,84,"HDG",pad3(S.ap.hdg));
+  win(560,110,"ALT",S.ap.alt);
+  win(770,90,"V/S",(S.ap.on?"+0000":"----"));
+  /* AP master light */
+  g.fillStyle=S.ap.on?"#153f27":"#1a1a16";g.fillRect(920,26,84,44);
+  g.strokeStyle=S.ap.on?"#59d98c":"#3d372c";g.strokeRect(920,26,84,44);
+  g.fillStyle=S.ap.on?"#6fffa8":"#5a5648";g.font="bold 15px Consolas";g.fillText("AP CMD",962,53);
+  g.fillStyle="#9fd68a";g.font="9px Consolas";g.textAlign="left";g.fillText("A/T ARM",20,42);
+  g.fillStyle="#ffd34d";g.beginPath();g.arc(70,52,4,0,7);g.fill();
+  CKD.mcp.tex.needsUpdate=true;
+}
+function drawOvhd(){
+  const g=CKD.ovhd.ctx,W=640;
+  const grd=g.createLinearGradient(0,0,0,760);
+  grd.addColorStop(0,"#191d14");grd.addColorStop(1,"#10130c");
+  g.fillStyle=grd;g.fillRect(0,0,W,760);
+  let y=14;
+  for(const grp of SYSDEF[curAcId()].panels){
+    if(grp.g==="AUDIO")continue;
+    /* group frame like real backlit panel lines */
+    const rows=Math.ceil(grp.items.length/6);
+    const boxH=rows*78+26;
+    g.strokeStyle="#4a5c3a";g.lineWidth=1.4;g.strokeRect(10,y,W-20,boxH);
+    g.fillStyle="#10130c";g.fillRect(24,y-6,g.measureText(grp.g).width+16,12);
+    g.fillStyle="#a8e08a";g.font="bold 10px Consolas";g.textAlign="left";
+    g.fillText(grp.g,30,y+4);
+    grp.items.forEach((it,i)=>{
+      const col=i%6,row=(i/6)|0;
+      const x=28+col*100,yy=y+18+row*78;
+      const v=SYS[it.k]|0;
+      if(it.t==="rot"){ /* rotary knob */
+        const kx=x+32,ky=yy+22;
+        const kg=g.createRadialGradient(kx-3,ky-4,2,kx,ky,15);
+        kg.addColorStop(0,"#8a8272");kg.addColorStop(1,"#2c2820");
+        g.fillStyle=kg;g.beginPath();g.arc(kx,ky,14,0,7);g.fill();
+        const ang=-2.2+v*(4.4/Math.max(1,it.pos.length-1));
+        g.strokeStyle="#fff";g.lineWidth=2.4;
+        g.beginPath();g.moveTo(kx,ky);g.lineTo(kx+Math.sin(ang)*13,ky-Math.cos(ang)*13);g.stroke();
+        g.fillStyle="#ffd9a0";g.font="7px Consolas";g.textAlign="center";
+        g.fillText(it.pos[v],kx,ky+26);
+      }else{ /* toggle switch */
+        const sx=x+20;
+        g.fillStyle="#1c2016";g.strokeStyle="#3d4a30";g.lineWidth=1.2;
+        g.fillRect(sx,yy,24,42);g.strokeRect(sx,yy,24,42);
+        const kg=g.createLinearGradient(sx,0,sx+24,0);
+        kg.addColorStop(0,"#6a6455");kg.addColorStop(0.5,"#b8b0a0");kg.addColorStop(1,"#5a5448");
+        g.fillStyle=kg;
+        g.beginPath();g.arc(sx+12,v?yy+10:yy+32,8,0,7);g.fill();
+        g.strokeStyle="#14170f";g.stroke();
+        if(v){g.fillStyle="#59d98c";g.font="bold 7px Consolas";g.textAlign="center";g.fillText("ON",sx+12,yy+50);}
+      }
+      g.fillStyle=v?"#d8f0be":"#7a9464";g.font="7.5px Consolas";g.textAlign="center";
+      g.fillText(it.l.length>13?it.l.slice(0,13):it.l,x+32,yy+62);
+    });
+    y+=boxH+14;
+    if(y>720)return void (CKD.ovhd.tex.needsUpdate=true);
+  }
+  CKD.ovhd.tex.needsUpdate=true;
+}
+function drawPanelTex(){
+  const g=CKD.panel.ctx;
+  const grd=g.createLinearGradient(0,0,0,300);
+  grd.addColorStop(0,"#2b2318");grd.addColorStop(0.5,"#221b12");grd.addColorStop(1,"#16110b");
+  g.fillStyle=grd;g.fillRect(0,0,1024,300);
+  /* warm floodlight sheen */
+  const fl=g.createRadialGradient(512,0,50,512,0,700);
+  fl.addColorStop(0,"rgba(255,170,80,0.10)");fl.addColorStop(1,"rgba(0,0,0,0)");
+  g.fillStyle=fl;g.fillRect(0,0,1024,300);
+  /* screen bezels (screens are separate 3D planes on top) */
+  g.fillStyle="#0c0a07";
+  for(const px of [0.02,0.26,0.5,0.74,0.98]){
+    const x=px*860+20;g.fillRect(x-8,66,176,140);
+    g.strokeStyle="#3d3628";g.strokeRect(x-8,66,176,140);
+  }
+  /* screws + trim */
+  g.fillStyle="#5a5040";
+  for(let x=20;x<1024;x+=64)for(const yy of [8,290]){g.beginPath();g.arc(x,yy,2.4,0,7);g.fill();}
+  /* standby instruments */
+  for(const cx of [58,966]){
+    g.fillStyle="#0d0d0f";g.beginPath();g.arc(cx,150,34,0,7);g.fill();
+    g.strokeStyle="#4a4438";g.lineWidth=2;g.stroke();
+    g.strokeStyle="#cfd8e4";g.lineWidth=1;
+    for(let a=0;a<12;a++){const t=a*Math.PI/6;
+      g.beginPath();g.moveTo(cx+Math.cos(t)*28,150+Math.sin(t)*28);g.lineTo(cx+Math.cos(t)*32,150+Math.sin(t)*32);g.stroke();}
+    g.fillStyle="#8a8272";g.font="7px Consolas";g.textAlign="center";
+    g.fillText(cx<512?"STBY ATT":"CHRONO",cx,196);
+  }
+  /* backlit legends */
+  g.fillStyle="#c8e0a8";g.font="8px Consolas";g.textAlign="center";
+  g.fillText("CAPT PFD",120,60);g.fillText("NAV DISPLAY",326,60);g.fillText("ENGINE  EICAS",532,60);
+  g.fillText("NAV DISPLAY",738,60);g.fillText("F/O PFD",944,60);
+  g.fillText("LDG GEAR",512,242);
+  g.strokeStyle="#4a4438";g.strokeRect(484,248,56,40);
+  CKD.panel.tex.needsUpdate=true;
+}
+function drawCDU(){
+  const g=CKD.cdu.ctx;
+  g.fillStyle="#101210";g.fillRect(0,0,256,256);
+  g.fillStyle="#020d04";g.fillRect(18,14,220,120);
+  g.strokeStyle="#3a4a3a";g.strokeRect(18,14,220,120);
+  g.fillStyle="#4ade80";g.font="bold 11px Consolas";g.textAlign="left";
+  g.fillText("AETHERWING FMC   ACT RTE",26,32);
+  g.fillStyle="#7dffab";g.font="10px Consolas";
+  g.fillText(RT.from+" → "+RT.to+"   "+RT.nm+" NM",26,50);
+  g.fillText("CRZ  FL"+String(Math.round(cruiseAltFt/100)).padStart(3,"0"),26,66);
+  g.fillText("RWY HDG "+pad3(rwyHdg),26,82);
+  g.fillStyle="#e06fff";g.fillText("<LEGS   PROG   PERF>",26,110);
+  /* keypad */
+  g.fillStyle="#22261f";
+  for(let r=0;r<4;r++)for(let c=0;c<6;c++){
+    g.fillRect(24+c*36,148+r*26,28,18);
+  }
+  CKD.cdu.tex.needsUpdate=true;
+}
+function cockpitTick(dt){
+  if(S.view!==0||!CKD)return;
+  drawPFD();drawND();drawEICAS();
+  CKD.t+=dt;
+  if(CKD.t>0.3){CKD.t=0;drawMCP();
+    if(CKD.ovhdDirty){drawOvhd();CKD.ovhdDirty=false;}}
 }
 
 /* ---------------- ENVIRONMENT APPLY ---------------- */
@@ -1139,6 +1439,7 @@ function buildSwitches(){
   refreshSwitchUI();
 }
 function refreshSwitchUI(){
+  if(CKD)CKD.ovhdDirty=true; /* 3D overhead texture mirrors switch states */
   document.querySelectorAll("#swGroups .sw").forEach(el=>{
     const k=el.dataset.k;
     if(el.classList.contains("rot")){
@@ -1739,7 +2040,7 @@ function updateCamera(dt){
     tmpV.set(seatX+shx*0.4,s*1.58+shy*0.4,-s*7.55);
     acGroup.localToWorld(tmpV);camera.position.copy(tmpV);
     camera.quaternion.setFromEuler(new THREE.Euler(S.pitch*D2R+shy*0.01,-S.hdg*D2R+shx*0.01,-S.roll*D2R,"YXZ"));
-    camera.fov=70;
+    camera.fov=75;
   }else if(S.view===1){ /* cabin — look out right window */
     tmpV.set(s*0.9,s*0.8,s*2.2);
     acGroup.localToWorld(tmpV);camera.position.copy(tmpV);
@@ -2125,6 +2426,7 @@ function loop(){
   }else updateSystems(0);
   lampsTick(dt);
   surfacesTick(dt);
+  cockpitTick(dt);
   updateCamera(dt);
   /* rain follows camera */
   if(rainPts&&rainPts.visible){
